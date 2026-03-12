@@ -1,1 +1,3 @@
 # rever
+
+Shopify Chatbot App

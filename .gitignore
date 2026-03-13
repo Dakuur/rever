@@ -1,0 +1,33 @@
+# ── Secrets ─────────────────────────────────────────────────────────────────
+.env
+rever-chatbot/.env
+
+# ── Firebase ─────────────────────────────────────────────────────────────────
+.firebase/
+firebase-debug.log
+firestore-debug.log
+
+# ── Flutter build output ──────────────────────────────────────────────────────
+flutter_app/build/
+flutter_app/.dart_tool/
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
+flutter_app/.pub-cache/
+flutter_app/.pub/
+
+# ── Shopify / Node ────────────────────────────────────────────────────────────
+rever-chatbot/node_modules/
+rever-chatbot/.shopify/
+rever-chatbot/prisma/dev.sqlite
+rever-chatbot/build/
+rever-chatbot/.react-router/
+
+# ── IDE / OS ──────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# ── Generated reference files ─────────────────────────────────────────────────
+firebase_sdk_settings.js

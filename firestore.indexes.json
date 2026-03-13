@@ -1,0 +1,20 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "return_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "customerEmail", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "messages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "timestamp", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

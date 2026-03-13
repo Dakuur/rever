@@ -8,10 +8,7 @@
 ///     --dart-define=SHOPIFY_STOREFRONT_TOKEN=xxx
 class AppConfig {
   // ── Gemini ──────────────────────────────────────────────────────────────
-  static const String geminiApiKey = String.fromEnvironment(
-    'GEMINI_API_KEY',
-    defaultValue: 'AIzaSyB5ywD4X5PAi8NuASUHI-97rLhHSczCVko',
-  );
+  static const String geminiApiKey = String.fromEnvironment('GEMINI_API_KEY');
 
   // ── Shopify Storefront API ───────────────────────────────────────────────
   static const String shopifyStoreDomain = String.fromEnvironment(

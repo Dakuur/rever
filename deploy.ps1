@@ -33,7 +33,7 @@ Get-Content $EnvFile | ForEach-Object {
 }
 
 # -- 2. Validate required keys ---------------------------------
-$required = @("GEMINI_API_KEY", "SHOPIFY_STORE_DOMAIN", "SHOPIFY_STOREFRONT_PUBLIC_TOKEN")
+$required = @("GROQ_API_KEY", "SHOPIFY_STORE_DOMAIN", "SHOPIFY_STOREFRONT_PUBLIC_TOKEN")
 foreach ($key in $required) {
     if (-not $env_vars.ContainsKey($key) -or $env_vars[$key] -eq "") {
         Write-Error "Missing key '$key' in .env"
@@ -55,7 +55,7 @@ if (-not $SkipBuild) {
     Push-Location $FlutterApp
 
     & flutter build web --release `
-        "--dart-define=GEMINI_API_KEY=$($env_vars['GEMINI_API_KEY'])" `
+        "--dart-define=GROQ_API_KEY=$($env_vars['GROQ_API_KEY'])" `
         "--dart-define=SHOPIFY_STORE_DOMAIN=$($env_vars['SHOPIFY_STORE_DOMAIN'])" `
         "--dart-define=SHOPIFY_STOREFRONT_TOKEN=$($env_vars['SHOPIFY_STOREFRONT_PUBLIC_TOKEN'])"
 

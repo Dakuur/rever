@@ -7,7 +7,10 @@
 ///     --dart-define=SHOPIFY_STORE_DOMAIN=yourstore.myshopify.com \
 ///     --dart-define=SHOPIFY_STOREFRONT_TOKEN=xxx
 class AppConfig {
-  // ── Gemini ──────────────────────────────────────────────────────────────
+  // ── Groq ─────────────────────────────────────────────────────────────────
+  static const String groqApiKey = String.fromEnvironment('GROQ_API_KEY');
+
+  // ── Gemini (kept for reference) ──────────────────────────────────────────
   static const String geminiApiKey = String.fromEnvironment('GEMINI_API_KEY');
 
   // ── Shopify Storefront API ───────────────────────────────────────────────

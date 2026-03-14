@@ -4,21 +4,10 @@ import '../config/app_config.dart';
 import '../models/chat_message.dart';
 import 'shopify_service.dart';
 
-// Uses the Gemini REST API directly via HTTP instead of the google_generative_ai
-// package, which has known web (dart2js) inconsistencies in v0.4.x.
-// This is identical in behaviour to debug_gemini.dart, which is confirmed working.
-
-const _geminiModel = 'gemini-2.5-flash';
-const _geminiEndpoint =
-    'https://generativelanguage.googleapis.com/v1beta/models/$_geminiModel:generateContent';
-
-// BLOCK_NONE on all categories to avoid false-positive safety blocks.
-const _safetySettings = [
-  {'category': 'HARM_CATEGORY_HARASSMENT',        'threshold': 'BLOCK_NONE'},
-  {'category': 'HARM_CATEGORY_HATE_SPEECH',       'threshold': 'BLOCK_NONE'},
-  {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold': 'BLOCK_NONE'},
-  {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold': 'BLOCK_NONE'},
-];
+// Groq API — OpenAI-compatible REST endpoint.
+// Model: llama-3.3-70b-versatile
+const _groqEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
+const _groqModel = 'llama-3.3-70b-versatile';
 
 class GeminiService {
   static final GeminiService _instance = GeminiService._();
@@ -26,6 +15,7 @@ class GeminiService {
   GeminiService._();
 
   // ── System Prompts ───────────────────────────────────────────────────────
+
   static const String _systemPromptPrePurchase = '''
 You are REVER's friendly shopping assistant embedded on a Shopify store.
 Your goal is to help customers find products, check availability, compare options and answer pre-purchase questions.
@@ -58,118 +48,90 @@ Rules:
 ''';
 
   // ── Core HTTP call ───────────────────────────────────────────────────────
-  Future<String> _callGemini({
+
+  Future<String> _callGroq({
     required String systemPrompt,
     required String userMessage,
     required List<ChatMessage> history,
   }) async {
-    final apiKey = AppConfig.geminiApiKey;
+    final apiKey = AppConfig.groqApiKey;
     if (apiKey.isEmpty) {
-      print('[GeminiService] ❌ GEMINI_API_KEY is empty – check --dart-define at build time.');
+      print('[GroqService] ❌ GROQ_API_KEY is empty – check --dart-define at build time.');
       return 'Configuration error: API key not set. Please contact support.';
     }
 
-    // Build contents array: system + history + current user message
-    final contents = <Map<String, dynamic>>[];
+    // Build OpenAI-format messages array.
+    final messages = <Map<String, dynamic>>[
+      {'role': 'system', 'content': systemPrompt},
+    ];
 
-    // System instruction as first user turn (v1beta REST style)
-    contents.add({
-      'role': 'user',
-      'parts': [{'text': '[SYSTEM]\n$systemPrompt\n[/SYSTEM]'}],
-    });
-    contents.add({
-      'role': 'model',
-      'parts': [{'text': 'Understood. I will follow those instructions.'}],
-    });
-
-    // Previous conversation history
+    // Previous conversation history (skip loading placeholders).
     for (final msg in history.where((m) => !m.isLoading)) {
-      contents.add({
-        'role': msg.role == MessageRole.user ? 'user' : 'model',
-        'parts': [{'text': msg.content}],
+      messages.add({
+        'role': msg.role == MessageRole.user ? 'user' : 'assistant',
+        'content': msg.content,
       });
     }
 
-    // Current user message
-    contents.add({
-      'role': 'user',
-      'parts': [{'text': userMessage}],
-    });
+    // Current user message (already appended to history before this call,
+    // so we don't add it again — history includes it as the last entry).
 
-    final body = jsonEncode({
-      'contents': contents,
-      'safetySettings': _safetySettings,
-      'generationConfig': {
-        'temperature': 0.7,
-        'maxOutputTokens': 1024,
-      },
-    });
+    print('[GroqService] POST $_groqEndpoint | model=$_groqModel'
+        ' | messages=${messages.length}'
+        ' | last="${userMessage.substring(0, userMessage.length.clamp(0, 80))}"');
 
-    print('[GeminiService] POST $_geminiEndpoint | model=$_geminiModel'
-        ' | history=${history.length} msgs'
-        ' | msg="${userMessage.substring(0, userMessage.length.clamp(0, 80))}"');
+    try {
+      final response = await http.post(
+        Uri.parse(_groqEndpoint),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: jsonEncode({
+          'model': _groqModel,
+          'messages': messages,
+          'temperature': 0.7,
+          'max_completion_tokens': 1024,
+          'top_p': 1,
+          'stream': false,
+        }),
+      );
 
-    final uri = Uri.parse('$_geminiEndpoint?key=$apiKey');
-    final response = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: body,
-    );
+      print('[GroqService] HTTP ${response.statusCode}');
 
-    print('[GeminiService] HTTP ${response.statusCode}');
+      if (response.statusCode != 200) {
+        print('[GroqService] ❌ Error: ${response.body.substring(0, response.body.length.clamp(0, 400))}');
+        return 'Error ${response.statusCode} from AI service. Please try again.';
+      }
 
-    if (response.statusCode != 200) {
-      print('[GeminiService] ❌ Non-200: ${response.body}');
-      return 'Error ${response.statusCode} from AI service. Please try again.';
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+
+      // OpenAI-format response: choices[0].message.content
+      final choices = json['choices'] as List<dynamic>? ?? [];
+      if (choices.isEmpty) {
+        print('[GroqService] ⚠️ choices is EMPTY. Full response: ${response.body}');
+        return 'I received an empty response. Please try again.';
+      }
+
+      final finishReason = choices.first['finish_reason'] as String? ?? 'unknown';
+      print('[GroqService] finish_reason: $finishReason');
+
+      final content = choices.first['message']?['content'] as String? ?? '';
+      if (content.trim().isEmpty) {
+        print('[GroqService] ⚠️ content is empty. finish_reason=$finishReason');
+        return 'I received an empty response. Please try again.';
+      }
+
+      print('[GroqService] ✅ Reply (${content.length} chars)');
+      return content;
+    } catch (e, stack) {
+      print('[GroqService] ❌ Exception: $e\n$stack');
+      return 'Connection error: ${e.toString()}. Please try again.';
     }
-
-    final json = jsonDecode(response.body) as Map<String, dynamic>;
-
-    // Check for API-level error
-    if (json.containsKey('error')) {
-      final err = json['error'] as Map<String, dynamic>;
-      print('[GeminiService] ❌ API error: ${err['message']}');
-      return 'AI service error: ${err['message']}. Please try again.';
-    }
-
-    // Check for prompt block
-    final feedback = json['promptFeedback'] as Map<String, dynamic>?;
-    if (feedback != null && feedback['blockReason'] != null) {
-      print('[GeminiService] ⚠️ Prompt blocked: ${feedback['blockReason']}');
-      return 'I could not process that request. Please rephrase your question.';
-    }
-
-    final candidates = json['candidates'] as List<dynamic>? ?? [];
-    if (candidates.isEmpty) {
-      print('[GeminiService] ⚠️ candidates is EMPTY. Full response: ${response.body}');
-      return 'I received an empty response. Please try again.';
-    }
-
-    final first = candidates.first as Map<String, dynamic>;
-    final finishReason = first['finishReason'] as String? ?? 'UNKNOWN';
-    print('[GeminiService] finishReason: $finishReason');
-
-    if (finishReason == 'SAFETY') {
-      print('[GeminiService] ⚠️ Candidate blocked by SAFETY: ${first['safetyRatings']}');
-      return 'I could not process that request due to content policies.';
-    }
-
-    final parts = (first['content']?['parts'] as List<dynamic>?) ?? [];
-    final text = parts
-        .whereType<Map<String, dynamic>>()
-        .map((p) => p['text'] as String? ?? '')
-        .join('');
-
-    if (text.trim().isEmpty) {
-      print('[GeminiService] ⚠️ text is empty. finishReason=$finishReason');
-      return 'I received an empty response. Please try again.';
-    }
-
-    print('[GeminiService] ✅ Reply (${text.length} chars)');
-    return text;
   }
 
   // ── Pre-purchase chat ────────────────────────────────────────────────────
+
   Future<String> sendPrePurchaseMessage({
     required String userMessage,
     required List<ChatMessage> history,
@@ -178,39 +140,41 @@ Rules:
     try {
       productContext = await ShopifyService().buildProductContext(userMessage);
     } catch (e) {
-      print('[GeminiService] Shopify context fetch failed: $e');
+      print('[GroqService] Shopify context fetch failed: $e');
     }
 
     final contextualMessage = productContext.isNotEmpty
         ? '$userMessage\n\n[Store context]\n$productContext'
         : userMessage;
 
-    try {
-      return await _callGemini(
-        systemPrompt: _systemPromptPrePurchase,
-        userMessage: contextualMessage,
-        history: history,
-      );
-    } catch (e, stack) {
-      print('[GeminiService] ❌ Unhandled error in sendPrePurchaseMessage: $e\n$stack');
-      return 'Connection error: ${e.toString()}. Please try again.';
-    }
+    // Replace last user message in history with the contextual version.
+    final enrichedHistory = [
+      ...history.where((m) => !m.isLoading && m.content != userMessage),
+      ChatMessage(
+        id: 'ctx',
+        role: MessageRole.user,
+        content: contextualMessage,
+        timestamp: DateTime.now(),
+      ),
+    ];
+
+    return _callGroq(
+      systemPrompt: _systemPromptPrePurchase,
+      userMessage: contextualMessage,
+      history: enrichedHistory,
+    );
   }
 
   // ── Post-purchase / returns chat ─────────────────────────────────────────
+
   Future<String> sendReturnMessage({
     required String userMessage,
     required List<ChatMessage> history,
   }) async {
-    try {
-      return await _callGemini(
-        systemPrompt: _systemPromptPostPurchase,
-        userMessage: userMessage,
-        history: history,
-      );
-    } catch (e, stack) {
-      print('[GeminiService] ❌ Unhandled error in sendReturnMessage: $e\n$stack');
-      return 'Connection error: ${e.toString()}. Please try again.';
-    }
+    return _callGroq(
+      systemPrompt: _systemPromptPostPurchase,
+      userMessage: userMessage,
+      history: history.where((m) => !m.isLoading).toList(),
+    );
   }
 }

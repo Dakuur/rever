@@ -10,9 +10,15 @@ import 'theme/rever_theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    // Firebase may fail inside a Shopify iframe due to auth-domain restrictions.
+    // The chat still works without Firebase (conversations won't be persisted).
+    print('[main] Firebase init failed (non-fatal): $e');
+  }
 
   runApp(const ReverApp());
 }

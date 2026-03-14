@@ -3,8 +3,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/chat_message.dart';
-import '../services/firebase_service.dart';
 import '../services/gemini_service.dart';
+import '../services/session_service.dart';
 import '../theme/rever_theme.dart';
 import '../widgets/chat_bubble.dart';
 import 'return_flow_screen.dart';
@@ -21,12 +21,13 @@ class _ChatScreenState extends State<ChatScreen>
     with SingleTickerProviderStateMixin {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
-  final _firebaseSvc = FirebaseService();
   final _geminiSvc = GeminiService();
+  final _sessionSvc = SessionService();
   final _uuid = const Uuid();
 
-  String? _conversationId;
+  String? _sessionId;
   final List<ChatMessage> _messages = [];
+  bool _isLoadingHistory = true;
   bool _isWaitingForBot = false;
   late ChatMode _mode;
   late AnimationController _sendBtnAnim;
@@ -39,26 +40,39 @@ class _ChatScreenState extends State<ChatScreen>
       vsync: this,
       duration: const Duration(milliseconds: 150),
     );
-    _initConversation();
+    _initSession();
   }
 
-  Future<void> _initConversation() async {
-    _addBotMessage(_welcomeMessage);
-    try {
-      _conversationId =
-          await _firebaseSvc.createConversation(_mode.name);
-    } catch (_) {
-      // Anonymous / offline fallback
-      _conversationId = _uuid.v4();
-    }
+  // ── Session init + history rehidration ────────────────────────────────────
+
+  Future<void> _initSession() async {
+    final sessionId = await _sessionSvc.getOrCreateSessionId();
+    final history = await _sessionSvc.loadRecentMessages(sessionId);
+
+    if (!mounted) return;
+    setState(() {
+      _sessionId = sessionId;
+      _isLoadingHistory = false;
+      if (history.isEmpty) {
+        // Fresh session — show welcome message without persisting it.
+        _messages.add(_buildWelcomeMessage());
+      } else {
+        _messages.addAll(history);
+        _scrollToBottom();
+      }
+    });
   }
 
-  String get _welcomeMessage {
-    if (_mode == ChatMode.prePurchase) {
-      return "Hi! 👋 I'm REVER, your shopping assistant. How can I help you today?\n\nYou can ask me about products, sizes, prices or availability.";
-    }
-    return "Hello! I'm here to help you with your return. 📦\n\nTo get started, please tell me your **order email address** and **order number**.";
-  }
+  ChatMessage _buildWelcomeMessage() => ChatMessage(
+        id: _uuid.v4(),
+        role: MessageRole.assistant,
+        content: _mode == ChatMode.prePurchase
+            ? "Hi! 👋 I'm REVER, your shopping assistant. How can I help you today?\n\nYou can ask me about products, sizes, prices or availability."
+            : "Hello! I'm here to help you with your return. 📦\n\nTo get started, please tell me your **order email address** and **order number**.",
+        timestamp: DateTime.now(),
+      );
+
+  // ── Message helpers ───────────────────────────────────────────────────────
 
   void _addBotMessage(String content) {
     final msg = ChatMessage(
@@ -68,7 +82,7 @@ class _ChatScreenState extends State<ChatScreen>
       timestamp: DateTime.now(),
     );
     setState(() => _messages.add(msg));
-    _saveMessage(msg);
+    _persistMessage(msg);
     _scrollToBottom();
   }
 
@@ -80,16 +94,16 @@ class _ChatScreenState extends State<ChatScreen>
       timestamp: DateTime.now(),
     );
     setState(() => _messages.add(msg));
-    _saveMessage(msg);
+    _persistMessage(msg);
     _scrollToBottom();
   }
 
-  Future<void> _saveMessage(ChatMessage msg) async {
-    if (_conversationId == null) return;
-    try {
-      await _firebaseSvc.addMessage(_conversationId!, msg);
-    } catch (_) {}
+  void _persistMessage(ChatMessage msg) {
+    if (_sessionId == null) return;
+    _sessionSvc.saveMessage(_sessionId!, msg);
   }
+
+  // ── Send message ──────────────────────────────────────────────────────────
 
   Future<void> _sendMessage() async {
     final text = _textController.text.trim();
@@ -97,33 +111,33 @@ class _ChatScreenState extends State<ChatScreen>
 
     _textController.clear();
     _addUserMessage(text);
-    setState(() => _isWaitingForBot = true);
-
-    // Add typing indicator
-    setState(() => _messages.add(ChatMessage.loading()));
+    setState(() {
+      _isWaitingForBot = true;
+      _messages.add(ChatMessage.loading());
+    });
     _scrollToBottom();
 
     try {
+      final history = _messages.where((m) => !m.isLoading).toList();
       String response;
       if (_mode == ChatMode.prePurchase) {
         response = await _geminiSvc.sendPrePurchaseMessage(
           userMessage: text,
-          history: _messages.where((m) => !m.isLoading).toList(),
+          history: history,
         );
       } else {
         response = await _geminiSvc.sendReturnMessage(
           userMessage: text,
-          history: _messages.where((m) => !m.isLoading).toList(),
+          history: history,
         );
       }
-
-      // Remove typing indicator
       setState(() {
         _messages.removeWhere((m) => m.isLoading);
         _isWaitingForBot = false;
       });
       _addBotMessage(response);
-    } catch (e) {
+    } catch (e, stack) {
+      print('[ChatScreen] ❌ Unhandled exception in _sendMessage: $e\n$stack');
       setState(() {
         _messages.removeWhere((m) => m.isLoading);
         _isWaitingForBot = false;
@@ -160,6 +174,8 @@ class _ChatScreenState extends State<ChatScreen>
     _sendBtnAnim.dispose();
     super.dispose();
   }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -209,32 +225,47 @@ class _ChatScreenState extends State<ChatScreen>
       child: SafeArea(
         child: Column(
           children: [
-            // Mode switcher
-            if (_mode == ChatMode.prePurchase) _ModeSwitcherBanner(
-              onReturnTap: _switchToReturnMode,
-            ),
-            // Messages list
-            Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                itemCount: _messages.length,
-                itemBuilder: (_, i) => ChatBubble(message: _messages[i]),
+            if (_mode == ChatMode.prePurchase)
+              _ModeSwitcherBanner(onReturnTap: _switchToReturnMode),
+            Expanded(child: _buildBody()),
+            if (!_isLoadingHistory)
+              _InputBar(
+                controller: _textController,
+                isLoading: _isWaitingForBot,
+                onSend: _sendMessage,
               ),
-            ),
-            _InputBar(
-              controller: _textController,
-              isLoading: _isWaitingForBot,
-              onSend: _sendMessage,
-            ),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildBody() {
+    if (_isLoadingHistory) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CupertinoActivityIndicator(radius: 14),
+            SizedBox(height: 12),
+            Text('Loading conversation…',
+                style: TextStyle(
+                    fontSize: 14, color: ReverTheme.textSecondary)),
+          ],
+        ),
+      );
+    }
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      itemCount: _messages.length,
+      itemBuilder: (_, i) => ChatBubble(message: _messages[i]),
+    );
+  }
 }
 
-// ── Mode Switcher Banner ─────────────────────────────────────────────────────
+// ── Mode Switcher Banner ──────────────────────────────────────────────────────
+
 class _ModeSwitcherBanner extends StatelessWidget {
   final VoidCallback onReturnTap;
   const _ModeSwitcherBanner({required this.onReturnTap});
@@ -276,7 +307,8 @@ class _ModeSwitcherBanner extends StatelessWidget {
   }
 }
 
-// ── Input Bar ────────────────────────────────────────────────────────────────
+// ── Input Bar ─────────────────────────────────────────────────────────────────
+
 class _InputBar extends StatelessWidget {
   final TextEditingController controller;
   final bool isLoading;

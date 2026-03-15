@@ -76,6 +76,10 @@ Rules:
       });
     }
 
+    if (userMessage.isNotEmpty) {
+      messages.add({'role': 'user', 'content': userMessage});
+    }
+
     final preview = userMessage.substring(0, userMessage.length.clamp(0, 80));
     print('[Chatbot] ── Request ──────────────────────────────────────');
     print('[Chatbot]   model   : $_groqModel');

@@ -177,3 +177,20 @@ All API keys are injected at Flutter build time via `--dart-define` and are neve
 | Add to cart suggestion and refund flow upgrade                                         | 1          | 7.5               |
 | Documenting and deploy fixing for easy app deployment recreation                       | 0.5        | 8                 |
 
+## Screenshots
+
+<div style="display:flex; gap:12px;">
+  <img src="images/suggest.png" alt="Chatbot UI on desktop" width="610"/>
+  <img src="images/mobile.png" alt="Chatbot UI on mobile" width="400"/>
+</div>
+
+### Return flow example
+
+<div style="display:flex; gap:12px; flex-wrap:wrap;">
+  <img src="images/return1.png" alt="Step 1" width="400"/>
+  <img src="images/return2.png" alt="Step 2" width="400"/>
+  <img src="images/return3.png" alt="Step 3" width="400"/>
+  <img src="images/return4.png" alt="Step 4" width="400"/>
+  <img src="images/return5.png" alt="Step 5" width="400"/>
+</div>
+

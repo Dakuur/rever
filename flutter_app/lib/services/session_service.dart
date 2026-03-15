@@ -57,6 +57,33 @@ class SessionService {
     }
   }
 
+  // ── Reset session ─────────────────────────────────────────────────────────
+
+  Future<String> resetSession() async {
+    final oldId = _cachedSessionId;
+    _cachedSessionId = null;
+
+    // Delete persisted messages from the old session (best-effort).
+    if (oldId != null) {
+      try {
+        final snap = await _messages(oldId).get();
+        for (final doc in snap.docs) {
+          await doc.reference.delete();
+        }
+      } catch (e) {
+        print('[SessionService] resetSession cleanup failed (non-fatal): $e');
+      }
+    }
+
+    // Clear stored session ID so getOrCreateSessionId creates a fresh one.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kSessionKey);
+    } catch (_) {}
+
+    return getOrCreateSessionId();
+  }
+
   // ── Load recent history ───────────────────────────────────────────────────
 
   Future<List<ChatMessage>> loadRecentMessages(String sessionId) async {

@@ -158,6 +158,49 @@ class _ChatScreenState extends State<ChatScreen>
     });
   }
 
+  // ── Reset chat ────────────────────────────────────────────────────────────
+
+  Future<void> _resetChat() async {
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('Start a new chat?'),
+        content: const Text(
+            'This will clear the current conversation and start fresh.'),
+        actions: [
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Clear'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _messages.clear();
+      _isLoadingHistory = true;
+    });
+
+    final newSessionId = await _sessionSvc.resetSession();
+    if (!mounted) return;
+    setState(() {
+      _sessionId = newSessionId;
+      _isLoadingHistory = false;
+      _messages.add(_buildWelcomeMessage());
+    });
+  }
+
+  bool get _hasUserMessages =>
+      _messages.any((m) => m.role == MessageRole.user);
+
   void _switchToReturnMode() {
     Navigator.of(context).push(
       CupertinoPageRoute(
@@ -210,6 +253,17 @@ class _ChatScreenState extends State<ChatScreen>
                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
           ],
         ),
+        leading: _hasUserMessages
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: _resetChat,
+                child: const Icon(
+                  CupertinoIcons.refresh,
+                  color: ReverTheme.textSecondary,
+                  size: 20,
+                ),
+              )
+            : null,
         trailing: _mode == ChatMode.prePurchase
             ? CupertinoButton(
                 padding: EdgeInsets.zero,

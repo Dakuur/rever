@@ -7,7 +7,10 @@ set -euo pipefail
 
 # -- Load .env ----------------------------------------------------------------
 if [ -f .env ]; then
-  export $(grep -v '^#' .env | grep -v '^$' | xargs)
+  set -a
+  # shellcheck source=/dev/null
+  source .env
+  set +a
 fi
 
 # -- Validate required keys ---------------------------------------------------

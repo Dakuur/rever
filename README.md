@@ -2,10 +2,10 @@
 
 An AI-powered chatbot embedded in a Shopify storefront as a floating widget. It handles two flows:
 
-- **Pre-purchase**: shopping assistant that answers product questions, checks availability, and suggests alternatives using Gemini AI + Shopify Storefront API.
+- **Pre-purchase**: shopping assistant that answers product questions, checks availability, and suggests alternatives using GROQ (Llama 3.3 70B) + Shopify Storefront API.
 - **Post-purchase / Returns**: guides customers through return alternatives (exchange → gift card with bonus → refund) before offering a refund, minimising returns.
 
-**Stack:** Flutter Web · Firebase (Auth + Firestore + Hosting) · Gemini 1.5 Flash · Shopify Theme App Extension
+**Stack:** Flutter Web · Firebase (Auth + Firestore + Hosting) · GROQ / Llama 3.3 70B · Shopify Theme App Extension
 
 ---
 
@@ -124,7 +124,7 @@ To run the Flutter app locally:
 ```bash
 cd flutter_app
 flutter run -d chrome \
-  --dart-define=GEMINI_API_KEY=your_key \
+  --dart-define=GROQ_API_KEY=your_groq_key \
   --dart-define=SHOPIFY_STORE_DOMAIN=yourstore.myshopify.com \
   --dart-define=SHOPIFY_STOREFRONT_TOKEN=your_token
 ```
@@ -145,7 +145,7 @@ Shopify storefront
   └── App Embed Block (rever-chat.liquid)
         └── iframe → https://rever-c494a.web.app
               └── Flutter Web app
-                    ├── GeminiService  → Gemini 1.5 Flash (AI responses)
+                    ├── GeminiService  → GROQ / Llama 3.3 70B (AI responses)
                     ├── ShopifyService → Storefront GraphQL API (product data)
                     └── FirebaseService → Firestore (session + return request logs)
 ```

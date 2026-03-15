@@ -11,7 +11,7 @@ if [ -f .env ]; then
 fi
 
 # -- Validate required keys ---------------------------------------------------
-: "${GEMINI_API_KEY:?Missing GEMINI_API_KEY in .env}"
+: "${GROQ_API_KEY:?Missing GROQ_API_KEY in .env}"
 : "${SHOPIFY_STORE_DOMAIN:?Missing SHOPIFY_STORE_DOMAIN in .env (e.g. yourstore.myshopify.com)}"
 : "${SHOPIFY_STOREFRONT_PUBLIC_TOKEN:?Missing SHOPIFY_STOREFRONT_PUBLIC_TOKEN in .env}"
 
@@ -21,7 +21,7 @@ echo "[OK] Keys validated"
 echo "[BUILD] Building Flutter Web..."
 cd flutter_app
 flutter build web --release \
-  --dart-define=GEMINI_API_KEY="${GEMINI_API_KEY}" \
+  --dart-define=GROQ_API_KEY="${GROQ_API_KEY}" \
   --dart-define=SHOPIFY_STORE_DOMAIN="${SHOPIFY_STORE_DOMAIN}" \
   --dart-define=SHOPIFY_STOREFRONT_TOKEN="${SHOPIFY_STOREFRONT_PUBLIC_TOKEN}"
 

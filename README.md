@@ -155,9 +155,13 @@ All API keys are injected at Flutter build time via `--dart-define` and are neve
 ## Future improvements / Known limitations
 
 - Multi-model support: Dynamically switch between different AI models based on query type (e.g. smaller model for simple FAQs, larger model for complex queries).
-- Better UI: Current style (cupertino) is basic and not aligned with Rever branding. Custom design and animations would improve user experience.
 - Slow load times: Flutter Web is heavy, leading to slow initial load. Consider a lighter frontend framework or optimizing Flutter build.
-- Better AI model: Models as Gemini 2.5 flash are available for free, but limited to a fe 
+- Better AI model: Models as Gemini 2.5 flash are available for free, but limited to a few requests per day. A paid API key for a more powerful model (e.g. Gemini 3.3) would improve response quality and allow more interactions.
+- More robust return flow: The current return flow is basic and could be expanded with more options (e.g. schedule a pickup, better handling of edge cases like partial refunds, damaged items, etc.).
+- More language support: Currently only English in the return flow is supported. Adding multilingual support would expand the potential user base.
+- Database checking: The app currently does not check for return requests in the database, which could lead to duplicate requests or unverified returns.
+- Product handling fixes: The model often recommends sold out products, or can't detect sales and discounts. Better integration with the Shopify API and more robust prompt engineering could help with this.
+- Real e-mail sending: The app currently simulates sending return confirmation emails. Integrating a real email service would make the return flow more realistic and functional.
 
 ## Activity log
 
@@ -169,5 +173,7 @@ All API keys are injected at Flutter build time via `--dart-define` and are neve
 | First implementation (Using Claude Code) with Flutter                                  | 1          | 4.5               |
 | UI bugfix, AI model switch to GROQ (Llama), and minor implementations (session cookie) | 1          | 5.5               |
 | Model context fixes, provide model with more info.                                     | 0.5        | 6                 |
-|                                                                                        |            |                   |
+| UI redesign, alligned with Rever colors and overall style                              | 0.5        | 6.5               |
+| Add to cart suggestion and refund flow upgrade                                         | 1          | 7.5               |
+| Documenting and deploy fixing for easy app deployment recreation                       | 0.5        | 8                 |
 

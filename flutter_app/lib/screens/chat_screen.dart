@@ -466,6 +466,7 @@ class _ChatScreenState extends State<ChatScreen>
                 isLoading: _isWaitingForBot,
                 onSend: _sendMessage,
               ),
+            SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
           ],
         ),
       ),

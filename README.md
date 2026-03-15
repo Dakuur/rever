@@ -42,7 +42,7 @@ rever/
 ### 1. Clone and configure environment
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/Dakuur/rever
 cd rever
 cp .env.example .env
 ```
@@ -151,3 +151,22 @@ Shopify storefront
 ```
 
 All API keys are injected at Flutter build time via `--dart-define` and are never stored in source code.
+
+## Future improvements / Known limitations
+
+- Multi-model support: Dynamically switch between different AI models based on query type (e.g. smaller model for simple FAQs, larger model for complex queries).
+- Better UI: Current style (cupertino) is basic and not aligned with Rever branding. Custom design and animations would improve user experience.
+- Slow load times: Flutter Web is heavy, leading to slow initial load. Consider a lighter frontend framework or optimizing Flutter build.
+
+## Activity log
+
+| Activity                                                                               | Work hours | Cummulative hours |
+|----------------------------------------------------------------------------------------|------------|-------------------|
+| Initial research, reading documentation and tutorials and planning using Google Gemini | 1.5        | 1.5               |
+| Shopify profile, shop, app and Storefront API creation (Shopify website)               | 1          | 2.5               |
+| Firebase, Gemini API creation and configuration                                        | 1          | 3.5               |
+| First implementation (Using Claude Code) with Flutter                                  | 1          | 4.5               |
+| UI bugfix, AI model switch to GROQ (Llama), and minor implementations (session cookie) | 1          | 5.5               |
+| Model context fixes, provide model with more info.                                     | 0.5        | 6                 |
+|                                                                                        |            |                   |
+

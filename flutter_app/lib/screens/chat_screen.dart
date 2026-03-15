@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/chat_message.dart';
+import '../services/cart_service.dart';
 import '../services/gemini_service.dart';
 import '../services/session_service.dart';
 import '../theme/rever_theme.dart';
@@ -40,6 +41,7 @@ class _ChatScreenState extends State<ChatScreen>
       vsync: this,
       duration: const Duration(milliseconds: 150),
     );
+    CartService().init(); // start listening for cart postMessage from Shopify parent
     _initSession();
   }
 
@@ -124,6 +126,7 @@ class _ChatScreenState extends State<ChatScreen>
         response = await _geminiSvc.sendPrePurchaseMessage(
           userMessage: text,
           history: history,
+          cartContext: CartService().buildCartContext(),
         );
       } else {
         response = await _geminiSvc.sendReturnMessage(

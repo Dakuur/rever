@@ -18,32 +18,37 @@ class GeminiService {
 
   static const String _systemPromptPrePurchase = '''
 You are REVER's friendly shopping assistant embedded on a Shopify store.
-Your goal is to help customers find products, check availability, compare options and answer pre-purchase questions.
+Your goal is to help customers find the right product, improve conversion, and reduce returns before they happen.
 
 Guidelines:
-- Be concise, warm and helpful.
-- When the user asks about a specific product, price or stock, always include the relevant product details provided in the context.
-- If you don't know something, say so honestly rather than guessing.
+- Be concise, warm and helpful. Keep responses to 2-3 short paragraphs max.
+- Answer questions about products, pricing, availability, and variants using the store context provided.
+- Guide shoppers to the right product based on their needs or use case (e.g. "I need a gift under €50").
+- PROACTIVELY surface details that prevent post-purchase issues: sizing guides, compatibility info, material descriptions, and estimated shipping times.
+- When a product might NOT be the best fit for the customer's stated need, say so honestly and suggest a better alternative from the catalog.
+- If the customer has items in their cart (provided in context), reference them when relevant — e.g. for compatibility, complementary products, or upsells.
 - Format prices with the currency symbol.
-- Keep responses to 2-3 short paragraphs max.
 - Respond in the same language as the user.
 ''';
 
   static const String _systemPromptPostPurchase = '''
-You are REVER's returns assistant. Your goal is to help customers with order returns and exchanges.
+You are REVER's returns and exchanges assistant. Your goal is to minimise refunds by offering better alternatives.
 
-IMPORTANT FLOW:
-1. First ask for the customer's email and order number if not provided.
-2. Acknowledge the return reason with empathy.
-3. ALWAYS offer these alternatives BEFORE mentioning refund:
-   a) Size/colour exchange (free, same item in different variant)
-   b) Gift card with a BONUS of +5€ extra value
-4. Only offer a full refund if the customer explicitly declines both alternatives.
-5. Confirm the chosen resolution and inform that the team will follow up by email.
+RETURN FLOW:
+1. Collect the customer's email and order number if not already provided.
+2. Ask which item they want to return and why (return reason is important).
+3. Acknowledge the reason with empathy.
+4. ALWAYS offer alternatives BEFORE mentioning a refund, in this order:
+   a) Exchange: different size, colour, or variant of the same product (free, instant).
+   b) Gift card: offer €5 MORE than the refund value (e.g. "€55 gift card instead of a €50 refund").
+   c) Different product: if the catalog context includes products that better fit their needs, suggest one specifically.
+5. Only present a full refund AFTER the customer has explicitly declined all alternatives.
+6. Once the customer chooses, confirm the resolution and let them know the team will follow up by email within 24h.
 
 Rules:
 - Never skip directly to refund. Always offer exchange and gift card first.
-- Be empathetic and professional.
+- Use the product catalog context (if provided) to suggest specific alternative products.
+- Be empathetic, professional, and concise.
 - Respond in the same language as the user.
 ''';
 
@@ -56,16 +61,14 @@ Rules:
   }) async {
     final apiKey = AppConfig.groqApiKey;
     if (apiKey.isEmpty) {
-      print('[GroqService] ❌ GROQ_API_KEY is empty – check --dart-define at build time.');
+      print('[GroqService] ❌ GROQ_API_KEY is empty – pass --dart-define=GROQ_API_KEY=... at build time');
       return 'Configuration error: API key not set. Please contact support.';
     }
 
-    // Build OpenAI-format messages array.
     final messages = <Map<String, dynamic>>[
       {'role': 'system', 'content': systemPrompt},
     ];
 
-    // Previous conversation history (skip loading placeholders).
     for (final msg in history.where((m) => !m.isLoading)) {
       messages.add({
         'role': msg.role == MessageRole.user ? 'user' : 'assistant',
@@ -73,12 +76,11 @@ Rules:
       });
     }
 
-    // Current user message (already appended to history before this call,
-    // so we don't add it again — history includes it as the last entry).
-
-    print('[GroqService] POST $_groqEndpoint | model=$_groqModel'
-        ' | messages=${messages.length}'
-        ' | last="${userMessage.substring(0, userMessage.length.clamp(0, 80))}"');
+    final preview = userMessage.substring(0, userMessage.length.clamp(0, 80));
+    print('[GroqService] ── Request ──────────────────────────────────────');
+    print('[GroqService]   model   : $_groqModel');
+    print('[GroqService]   messages: ${messages.length} (incl. system)');
+    print('[GroqService]   last msg: "$preview${userMessage.length > 80 ? "…" : ""}"');
 
     try {
       final response = await http.post(
@@ -97,35 +99,43 @@ Rules:
         }),
       );
 
-      print('[GroqService] HTTP ${response.statusCode}');
+      print('[GroqService] ── Response ─────────────────────────────────────');
+      print('[GroqService]   HTTP status : ${response.statusCode}');
 
       if (response.statusCode != 200) {
-        print('[GroqService] ❌ Error: ${response.body.substring(0, response.body.length.clamp(0, 400))}');
+        final errPreview = response.body.substring(0, response.body.length.clamp(0, 400));
+        print('[GroqService]   ❌ Error body: $errPreview');
         return 'Error ${response.statusCode} from AI service. Please try again.';
       }
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
-
-      // OpenAI-format response: choices[0].message.content
       final choices = json['choices'] as List<dynamic>? ?? [];
       if (choices.isEmpty) {
-        print('[GroqService] ⚠️ choices is EMPTY. Full response: ${response.body}');
+        print('[GroqService]   ⚠️ Empty choices array. Full body: ${response.body}');
         return 'I received an empty response. Please try again.';
       }
 
       final finishReason = choices.first['finish_reason'] as String? ?? 'unknown';
-      print('[GroqService] finish_reason: $finishReason');
-
       final content = choices.first['message']?['content'] as String? ?? '';
+      final usage = json['usage'] as Map<String, dynamic>?;
+
+      print('[GroqService]   finish_reason     : $finishReason');
+      print('[GroqService]   reply length      : ${content.length} chars');
+      if (usage != null) {
+        print('[GroqService]   tokens in/out/total: '
+            '${usage['prompt_tokens']}/${usage['completion_tokens']}/${usage['total_tokens']}');
+      }
+
       if (content.trim().isEmpty) {
-        print('[GroqService] ⚠️ content is empty. finish_reason=$finishReason');
+        print('[GroqService]   ⚠️ Content is empty despite finish_reason=$finishReason');
         return 'I received an empty response. Please try again.';
       }
 
-      print('[GroqService] ✅ Reply (${content.length} chars)');
+      print('[GroqService] ✅ Reply ready');
       return content;
     } catch (e, stack) {
-      print('[GroqService] ❌ Exception: $e\n$stack');
+      print('[GroqService] ❌ Exception: $e');
+      print('[GroqService]   $stack');
       return 'Connection error: ${e.toString()}. Please try again.';
     }
   }
@@ -135,33 +145,32 @@ Rules:
   Future<String> sendPrePurchaseMessage({
     required String userMessage,
     required List<ChatMessage> history,
+    String cartContext = '',
   }) async {
+    print('[GroqService] ── Pre-purchase ──────────────────────────────────');
+    print('[GroqService]   cart context : ${cartContext.isEmpty ? "none" : "${cartContext.length} chars"}');
+
     String productContext = '';
     try {
       productContext = await ShopifyService().buildProductContext(userMessage);
     } catch (e) {
-      print('[GroqService] Shopify context fetch failed: $e');
+      print('[GroqService]   ⚠️ Shopify product context failed: $e');
     }
+    print('[GroqService]   product context: ${productContext.isEmpty ? "none" : "${productContext.length} chars"}');
 
-    final contextualMessage = productContext.isNotEmpty
-        ? '$userMessage\n\n[Store context]\n$productContext'
-        : userMessage;
+    // Build enriched system prompt with live context appended
+    final contextParts = <String>[];
+    if (productContext.isNotEmpty) contextParts.add(productContext);
+    if (cartContext.isNotEmpty) contextParts.add(cartContext);
 
-    // Replace last user message in history with the contextual version.
-    final enrichedHistory = [
-      ...history.where((m) => !m.isLoading && m.content != userMessage),
-      ChatMessage(
-        id: 'ctx',
-        role: MessageRole.user,
-        content: contextualMessage,
-        timestamp: DateTime.now(),
-      ),
-    ];
+    final systemPrompt = contextParts.isEmpty
+        ? _systemPromptPrePurchase
+        : '$_systemPromptPrePurchase\n\n--- Store context ---\n${contextParts.join('\n\n')}';
 
     return _callGroq(
-      systemPrompt: _systemPromptPrePurchase,
-      userMessage: contextualMessage,
-      history: enrichedHistory,
+      systemPrompt: systemPrompt,
+      userMessage: userMessage,
+      history: history,
     );
   }
 
@@ -170,9 +179,17 @@ Rules:
   Future<String> sendReturnMessage({
     required String userMessage,
     required List<ChatMessage> history,
+    String productCatalogContext = '',
   }) async {
+    print('[GroqService] ── Returns ────────────────────────────────────────');
+    print('[GroqService]   catalog context: ${productCatalogContext.isEmpty ? "none" : "${productCatalogContext.length} chars"}');
+
+    final systemPrompt = productCatalogContext.isEmpty
+        ? _systemPromptPostPurchase
+        : '$_systemPromptPostPurchase\n\n--- Available products for exchange/alternative suggestions ---\n$productCatalogContext';
+
     return _callGroq(
-      systemPrompt: _systemPromptPostPurchase,
+      systemPrompt: systemPrompt,
       userMessage: userMessage,
       history: history.where((m) => !m.isLoading).toList(),
     );

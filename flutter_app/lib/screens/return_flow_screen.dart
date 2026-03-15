@@ -5,6 +5,7 @@ import '../models/chat_message.dart';
 import '../models/return_request.dart';
 import '../services/firebase_service.dart';
 import '../services/gemini_service.dart';
+import '../services/shopify_service.dart';
 import '../theme/rever_theme.dart';
 import '../widgets/chat_bubble.dart';
 import '../widgets/return_option_card.dart';
@@ -151,9 +152,30 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
         _productDescription = text.split(' ').take(6).join(' ');
       }
 
+      String catalogContext = '';
+      try {
+        if (_productDescription.isNotEmpty) {
+          catalogContext = await ShopifyService().buildProductContext(_productDescription);
+        } else {
+          catalogContext = await ShopifyService().getAllProducts().then(
+            (products) {
+              if (products.isEmpty) return '';
+              final buf = StringBuffer('Available products:\n');
+              for (final p in products) {
+                buf.writeln('- ${p.title} | ${p.formattedPrice} | In stock: ${p.availableForSale} | Variants: ${p.variants.join(', ')}');
+              }
+              return buf.toString();
+            },
+          );
+        }
+      } catch (e) {
+        print('[ReturnFlowScreen] ⚠️ Could not fetch product catalog: $e');
+      }
+
       final response = await _geminiSvc.sendReturnMessage(
         userMessage: text,
         history: _messages.where((m) => !m.isLoading).toList(),
+        productCatalogContext: catalogContext,
       );
 
       setState(() {

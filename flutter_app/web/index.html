@@ -66,6 +66,25 @@
       setTimeout(() => splash.remove(), 500);
     });
   </script>
+  <script>
+    // REVER cart bridge – debug listener.
+    // The actual cart handling is done by CartService in Dart via dart:html window.onMessage.
+    // This listener only logs so you can confirm the postMessage arrived in the iframe context.
+    window.addEventListener('message', function(e) {
+      if (!e.data) return;
+      try {
+        var msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+        if (!msg || msg.type !== 'rever:cart') return;
+        var cart = msg.cart || {};
+        var itemCount = cart.item_count || 0;
+        var total = cart.total_price ? (cart.total_price / 100).toFixed(2) : '0.00';
+        var currency = cart.currency || 'EUR';
+        console.log('[REVER] 🛒 postMessage received in iframe: ' + itemCount + ' items | ' + currency + ' ' + total);
+      } catch(err) {
+        console.warn('[REVER] ⚠️ Error in debug cart listener:', err);
+      }
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

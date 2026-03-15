@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'shopify_product.dart';
 
 enum MessageRole { user, assistant }
 
@@ -11,12 +12,17 @@ class ChatMessage {
   final DateTime timestamp;
   final bool isLoading;
 
+  /// When non-null this message renders as a product offer card instead of text.
+  /// Not persisted to Firestore (ephemeral UI state).
+  final ShopifyProduct? offer;
+
   const ChatMessage({
     required this.id,
     required this.role,
     required this.content,
     required this.timestamp,
     this.isLoading = false,
+    this.offer,
   });
 
   factory ChatMessage.loading() => ChatMessage(

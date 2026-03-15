@@ -3,9 +3,11 @@ import 'package:flutter/cupertino.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/chat_message.dart';
+import '../models/shopify_product.dart';
 import '../services/cart_service.dart';
-import '../services/gemini_service.dart';
+import '../services/chatbot_service.dart';
 import '../services/session_service.dart';
+import '../services/shopify_service.dart';
 import '../theme/rever_theme.dart';
 import '../widgets/chat_bubble.dart';
 import 'return_flow_screen.dart';
@@ -22,7 +24,7 @@ class _ChatScreenState extends State<ChatScreen>
     with SingleTickerProviderStateMixin {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
-  final _geminiSvc = GeminiService();
+  final _chatbotSvc = ChatbotService();
   final _sessionSvc = SessionService();
   final _uuid = const Uuid();
 
@@ -105,6 +107,121 @@ class _ChatScreenState extends State<ChatScreen>
     _sessionSvc.saveMessage(_sessionId!, msg);
   }
 
+  // ── Offer / add-to-cart trigger detection ────────────────────────────────
+
+  ShopifyProduct? _lastRecommendedProduct;
+  String _lastOfferQuery = '';
+
+  static const _offerTriggers = [
+    // English
+    'offer', 'offers', 'sale', 'sales', 'deal', 'deals',
+    'discount', 'discounts', 'promotion', 'promo',
+    'recommend', 'recommendation', 'suggest', 'suggestion',
+    'cheap', 'cheapest', 'best price', 'expensive', 'most expensive',
+    'show me', 'find me',
+    // Spanish
+    'recomienda', 'recomiendame', 'recomendación', 'recomendacion',
+    'oferta', 'ofertas', 'descuento', 'descuentos',
+    'promoción', 'promocion',
+    'barato', 'baratos', 'más barato', 'mas barato', 'precio bajo',
+    'caro', 'mas caro', 'más caro', 'el más caro', 'el mas caro',
+    'sugerencia', 'sugiere', 'sugiéreme',
+    'muéstrame', 'muestrame', 'encuéntrame', 'encuentrame',
+    'dame el', 'dame algo', 'dame un', 'dame una',
+    'qué tienes', 'que tienes', 'qué hay', 'que hay',
+  ];
+
+  static const _addToCartTriggers = [
+    // English
+    'add to cart', 'add it', 'buy it', 'i want it', 'i\'ll take it',
+    // Spanish
+    'añadir al carrito', 'añadelo', 'añádelo', 'añadir',
+    'agregar al carrito', 'agrégalo', 'agregalo',
+    'lo quiero', 'quiero comprarlo', 'quiero ese', 'quiero éste',
+    'comprar', 'cómpralo', 'compralo',
+  ];
+
+  bool _isOfferTrigger(String text) {
+    final lower = text.toLowerCase();
+    return _offerTriggers.any((t) => lower.contains(t));
+  }
+
+  bool _isAddToCartTrigger(String text) {
+    final lower = text.toLowerCase();
+    return _addToCartTriggers.any((t) => lower.contains(t));
+  }
+
+  Future<void> _handleOfferTrigger(String userQuery) async {
+    _lastOfferQuery = userQuery;
+    setState(() {
+      _isWaitingForBot = true;
+      _messages.add(ChatMessage.loading());
+    });
+    _scrollToBottom();
+
+    try {
+      final product = await ShopifyService().fetchRecommendedProduct(userQuery);
+      setState(() {
+        _messages.removeWhere((m) => m.isLoading);
+        _isWaitingForBot = false;
+      });
+
+      if (product == null || !product.availableForSale) {
+        _addBotMessage(
+            "Sorry, I couldn't find any products on sale right now. "
+            "Feel free to ask me about any specific item!");
+        return;
+      }
+
+      _lastRecommendedProduct = product;
+      print('[ChatScreen] 💡 Offer card shown — product="${product.title}" variantId=${product.variantId}');
+
+      _addBotMessage(product.isOnSale
+          ? "I found a great deal for you! 🎉"
+          : "Here's one of our top picks for you:");
+
+      final offerMsg = ChatMessage(
+        id: _uuid.v4(),
+        role: MessageRole.assistant,
+        content: '',
+        timestamp: DateTime.now(),
+        offer: product,
+      );
+      setState(() => _messages.add(offerMsg));
+      _scrollToBottom();
+    } catch (e) {
+      print('[ChatScreen] ❌ fetchSaleProduct error: $e');
+      setState(() {
+        _messages.removeWhere((m) => m.isLoading);
+        _isWaitingForBot = false;
+      });
+      _addBotMessage('Sorry, something went wrong. Please try again.');
+    }
+  }
+
+  Future<void> _handleAddToCartTrigger() async {
+    final product = _lastRecommendedProduct;
+    if (product == null) {
+      print('[ChatScreen] ℹ️ Add-to-cart trigger but no last product — showing offer card instead');
+      await _handleOfferTrigger(_lastOfferQuery.isEmpty ? 'recommend' : _lastOfferQuery);
+      return;
+    }
+
+    print('[ChatScreen] 🛒 Add-to-cart trigger — using last product "${product.title}" variantId=${product.variantId}');
+
+    // Show the offer card for the last recommended product so the user confirms
+    _addBotMessage('Here\'s the product I recommended — confirm to add it to your cart:');
+    final offerMsg = ChatMessage(
+      id: _uuid.v4(),
+      role: MessageRole.assistant,
+      content: '',
+      timestamp: DateTime.now(),
+      offer: product,
+    );
+    setState(() => _messages.add(offerMsg));
+    _scrollToBottom();
+  }
+
   // ── Send message ──────────────────────────────────────────────────────────
 
   Future<void> _sendMessage() async {
@@ -113,6 +230,21 @@ class _ChatScreenState extends State<ChatScreen>
 
     _textController.clear();
     _addUserMessage(text);
+
+    // Add-to-cart trigger: skip AI, show offer card for last product
+    if (_mode == ChatMode.prePurchase && _isAddToCartTrigger(text)) {
+      print('[ChatScreen] 🛒 Add-to-cart trigger detected: "$text"');
+      await _handleAddToCartTrigger();
+      return;
+    }
+
+    // Offer trigger: skip AI, fetch recommended product directly (faster)
+    if (_mode == ChatMode.prePurchase && _isOfferTrigger(text)) {
+      print('[ChatScreen] 💡 Offer trigger detected: "$text"');
+      await _handleOfferTrigger(text);
+      return;
+    }
+
     setState(() {
       _isWaitingForBot = true;
       _messages.add(ChatMessage.loading());
@@ -123,13 +255,13 @@ class _ChatScreenState extends State<ChatScreen>
       final history = _messages.where((m) => !m.isLoading).toList();
       String response;
       if (_mode == ChatMode.prePurchase) {
-        response = await _geminiSvc.sendPrePurchaseMessage(
+        response = await _chatbotSvc.sendPrePurchaseMessage(
           userMessage: text,
           history: history,
           cartContext: CartService().buildCartContext(),
         );
       } else {
-        response = await _geminiSvc.sendReturnMessage(
+        response = await _chatbotSvc.sendReturnMessage(
           userMessage: text,
           history: history,
         );
@@ -164,24 +296,64 @@ class _ChatScreenState extends State<ChatScreen>
   // ── Reset chat ────────────────────────────────────────────────────────────
 
   Future<void> _resetChat() async {
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoModalPopup<bool>(
       context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('Start a new chat?'),
-        content: const Text(
-            'This will clear the current conversation and start fresh.'),
-        actions: [
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Clear'),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-        ],
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 32),
+        decoration: BoxDecoration(
+          color: ReverTheme.cardBg,
+          borderRadius: BorderRadius.circular(ReverTheme.radiusLarge),
+          boxShadow: ReverTheme.cardShadow,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Header ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Start a new chat?', style: ReverTheme.headingMedium),
+                  const SizedBox(height: 4),
+                  Text(
+                    'This will clear the current conversation.',
+                    style: ReverTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            Container(height: 0.5, color: ReverTheme.divider),
+            // ── Actions ──
+            Row(
+              children: [
+                Expanded(
+                  child: CupertinoButton(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: Text('Cancel',
+                        style: ReverTheme.bodyRegular.copyWith(
+                          color: ReverTheme.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        )),
+                  ),
+                ),
+                Container(width: 0.5, height: 52, color: ReverTheme.divider),
+                Expanded(
+                  child: CupertinoButton(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: Text('Clear',
+                        style: ReverTheme.bodyRegular.copyWith(
+                          color: ReverTheme.error,
+                          fontWeight: FontWeight.w700,
+                        )),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
 
@@ -235,25 +407,28 @@ class _ChatScreenState extends State<ChatScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 28,
-              height: 28,
+              width: 26,
+              height: 26,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [ReverTheme.accent, Color(0xFF9B96FF)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(7),
+                boxShadow: ReverTheme.glowShadow,
               ),
-              child: const Center(
+              child: Center(
                 child: Text('R',
-                    style: TextStyle(
-                        color: CupertinoColors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700)),
+                    style: ReverTheme.caption.copyWith(
+                      color: CupertinoColors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    )),
               ),
             ),
             const SizedBox(width: 8),
-            const Text('REVER Assistant',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+            Text('REVER', style: ReverTheme.headingMedium),
           ],
         ),
         leading: _hasUserMessages
@@ -263,7 +438,7 @@ class _ChatScreenState extends State<ChatScreen>
                 child: const Icon(
                   CupertinoIcons.refresh,
                   color: ReverTheme.textSecondary,
-                  size: 20,
+                  size: 18,
                 ),
               )
             : null,
@@ -271,11 +446,11 @@ class _ChatScreenState extends State<ChatScreen>
             ? CupertinoButton(
                 padding: EdgeInsets.zero,
                 onPressed: _switchToReturnMode,
-                child: const Text('Returns',
-                    style: TextStyle(
-                        color: ReverTheme.accent,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500)),
+                child: Text('Returns',
+                    style: ReverTheme.bodySmall.copyWith(
+                      color: ReverTheme.accent,
+                      fontWeight: FontWeight.w600,
+                    )),
               )
             : null,
       ),
@@ -299,15 +474,14 @@ class _ChatScreenState extends State<ChatScreen>
 
   Widget _buildBody() {
     if (_isLoadingHistory) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CupertinoActivityIndicator(radius: 14),
-            SizedBox(height: 12),
-            Text('Loading conversation…',
-                style: TextStyle(
-                    fontSize: 14, color: ReverTheme.textSecondary)),
+            const CupertinoActivityIndicator(
+                radius: 12, color: ReverTheme.accent),
+            const SizedBox(height: 12),
+            Text('Loading…', style: ReverTheme.bodySmall),
           ],
         ),
       );
@@ -335,28 +509,30 @@ class _ModeSwitcherBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: ReverTheme.accentLight,
         borderRadius: BorderRadius.circular(ReverTheme.radiusMedium),
-        border: Border.all(color: ReverTheme.accent.withValues(alpha: 0.2)),
+        border: Border.all(
+            color: ReverTheme.accent.withValues(alpha: 0.25), width: 1),
       ),
       child: Row(
         children: [
           const Icon(CupertinoIcons.arrow_uturn_left,
-              color: ReverTheme.accent, size: 16),
+              color: ReverTheme.accent, size: 14),
           const SizedBox(width: 8),
-          const Expanded(
+          Expanded(
             child: Text(
               'Already purchased? Start a return or exchange.',
-              style: TextStyle(fontSize: 13, color: ReverTheme.textPrimary),
+              style: ReverTheme.bodySmall
+                  .copyWith(color: ReverTheme.textPrimary),
             ),
           ),
           CupertinoButton(
             padding: EdgeInsets.zero,
             minimumSize: Size.zero,
             onPressed: onReturnTap,
-            child: const Text('Start →',
-                style: TextStyle(
-                    color: ReverTheme.accent,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600)),
+            child: Text('Start →',
+                style: ReverTheme.bodySmall.copyWith(
+                  color: ReverTheme.accent,
+                  fontWeight: FontWeight.w700,
+                )),
           ),
         ],
       ),
@@ -380,23 +556,25 @@ class _InputBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
       decoration: const BoxDecoration(
         color: ReverTheme.cardBg,
         border: Border(top: BorderSide(color: ReverTheme.divider, width: 0.5)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
             child: CupertinoTextField(
               controller: controller,
               placeholder: 'Ask about products…',
+              placeholderStyle: ReverTheme.bodyRegular
+                  .copyWith(color: ReverTheme.textSecondary),
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: ReverTheme.surface,
-                borderRadius:
-                    BorderRadius.circular(ReverTheme.radiusFull),
+                color: ReverTheme.cardBgRaised,
+                borderRadius: BorderRadius.circular(ReverTheme.radiusMedium),
                 border: Border.all(color: ReverTheme.divider),
               ),
               style: ReverTheme.bodyRegular,
@@ -414,16 +592,13 @@ class _InputBar extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: isLoading
-                    ? ReverTheme.textSecondary
-                    : ReverTheme.accent,
-                borderRadius:
-                    BorderRadius.circular(ReverTheme.radiusFull),
+                color: isLoading ? ReverTheme.cardBgRaised : ReverTheme.accent,
+                borderRadius: BorderRadius.circular(ReverTheme.radiusMedium),
                 boxShadow: isLoading ? null : ReverTheme.floatingShadow,
               ),
               child: isLoading
                   ? const CupertinoActivityIndicator(
-                      color: CupertinoColors.white, radius: 10)
+                      color: ReverTheme.accent, radius: 10)
                   : const Icon(CupertinoIcons.arrow_up,
                       color: CupertinoColors.white, size: 18),
             ),

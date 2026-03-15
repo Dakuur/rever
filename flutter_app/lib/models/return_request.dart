@@ -24,6 +24,7 @@ class ReturnRequest {
   });
 
   Map<String, dynamic> toMap() => {
+        'id': id,
         'customerEmail': customerEmail,
         'orderId': orderId,
         'productDescription': productDescription,

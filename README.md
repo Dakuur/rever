@@ -157,6 +157,7 @@ All API keys are injected at Flutter build time via `--dart-define` and are neve
 - Multi-model support: Dynamically switch between different AI models based on query type (e.g. smaller model for simple FAQs, larger model for complex queries).
 - Better UI: Current style (cupertino) is basic and not aligned with Rever branding. Custom design and animations would improve user experience.
 - Slow load times: Flutter Web is heavy, leading to slow initial load. Consider a lighter frontend framework or optimizing Flutter build.
+- Better AI model: Models as Gemini 2.5 flash are available for free, but limited to a fe 
 
 ## Activity log
 

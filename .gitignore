@@ -28,6 +28,7 @@ rever-chatbot/.react-router/
 *.iml
 .DS_Store
 Thumbs.db
+.claude
 
 # ── Generated reference files ─────────────────────────────────────────────────
 firebase_sdk_settings.js

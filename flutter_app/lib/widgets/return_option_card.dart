@@ -21,23 +21,24 @@ class ReturnOptionCard extends StatelessWidget {
     return GestureDetector(
       onTap: onSelected,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isSelected ? ReverTheme.accentLight : ReverTheme.cardBg,
+          color: isSelected ? ReverTheme.accentLight : ReverTheme.cardBgRaised,
           borderRadius: BorderRadius.circular(ReverTheme.radiusMedium),
           border: Border.all(
-            color: isSelected ? ReverTheme.accent : ReverTheme.divider,
+            color: isSelected
+                ? ReverTheme.accent
+                : ReverTheme.divider,
             width: isSelected ? 1.5 : 1,
           ),
-          boxShadow: isSelected ? ReverTheme.cardShadow : null,
         ),
         child: Row(
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
                 color: config['bgColor'] as Color,
                 borderRadius: BorderRadius.circular(10),
@@ -45,7 +46,7 @@ class ReturnOptionCard extends StatelessWidget {
               child: Icon(
                 config['icon'] as IconData,
                 color: config['iconColor'] as Color,
-                size: 20,
+                size: 18,
               ),
             ),
             const SizedBox(width: 12),
@@ -57,7 +58,7 @@ class ReturnOptionCard extends StatelessWidget {
                     children: [
                       Text(
                         config['title'] as String,
-                        style: ReverTheme.headingMedium.copyWith(fontSize: 15),
+                        style: ReverTheme.headingMedium.copyWith(fontSize: 14),
                       ),
                       if (config['badge'] != null) ...[
                         const SizedBox(width: 6),
@@ -70,10 +71,10 @@ class ReturnOptionCard extends StatelessWidget {
                           ),
                           child: Text(
                             config['badge'] as String,
-                            style: const TextStyle(
-                                color: CupertinoColors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700),
+                            style: ReverTheme.caption.copyWith(
+                              color: CupertinoColors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ],
@@ -99,10 +100,10 @@ class ReturnOptionCard extends StatelessWidget {
   static const Map<ReturnOption, Map<String, Object?>> _configs = {
     ReturnOption.sizeExchange: {
       'icon': CupertinoIcons.arrow_2_squarepath,
-      'bgColor': Color(0xFFEDECFF),
+      'bgColor': Color(0xFFE8F4FF),
       'iconColor': ReverTheme.accent,
       'title': 'Size / Colour Exchange',
-      'subtitle': 'Get the same item in a different size or colour',
+      'subtitle': 'Same item, different size or colour',
       'badge': null,
     },
     ReturnOption.giftCard: {

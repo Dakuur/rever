@@ -21,7 +21,12 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     /* Enable text selection inside Flutter Web */
     flt-glass-pane { user-select: text; -webkit-user-select: text; }
-    html, body { height: 100%; background: transparent; }
+    /* Prevent scroll from propagating to the Shopify parent page */
+    html, body {
+      height: 100%;
+      background: transparent;
+      overscroll-behavior: contain;
+    }
     /* Loading splash */
     #loading-splash {
       position: fixed; inset: 0;

@@ -1,8 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:uuid/uuid.dart';
-
 import '../models/chat_message.dart';
 import '../models/return_request.dart';
 
@@ -14,8 +12,6 @@ class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
-  final _uuid = const Uuid();
-
   // ── Auth ────────────────────────────────────────────────────────────────
   Stream<User?> get authStateChanges => _auth.authStateChanges();
   User? get currentUser => _auth.currentUser;
@@ -86,10 +82,8 @@ class FirebaseService {
   CollectionReference<Map<String, dynamic>> get _returnRequests =>
       _db.collection('return_requests');
 
-  Future<String> saveReturnRequest(ReturnRequest req) async {
-    final id = _uuid.v4();
-    await _returnRequests.doc(id).set(req.toMap());
-    return id;
+  Future<void> saveReturnRequest(ReturnRequest req) async {
+    await _returnRequests.doc(req.id).set(req.toMap());
   }
 
   Future<List<ReturnRequest>> getReturnRequests({String? email}) async {

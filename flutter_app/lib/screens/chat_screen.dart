@@ -2,10 +2,12 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:uuid/uuid.dart';
 
+import '../l10n/app_strings.dart';
 import '../models/chat_message.dart';
 import '../models/shopify_product.dart';
 import '../services/cart_service.dart';
 import '../services/chatbot_service.dart';
+import '../services/language_service.dart';
 import '../services/session_service.dart';
 import '../services/shopify_service.dart';
 import '../theme/rever_theme.dart';
@@ -34,6 +36,8 @@ class _ChatScreenState extends State<ChatScreen>
   bool _isWaitingForBot = false;
   late ChatMode _mode;
   late AnimationController _sendBtnAnim;
+
+  AppStrings get _s => AppStrings.of(LanguageService().code);
 
   @override
   void initState() {
@@ -70,9 +74,7 @@ class _ChatScreenState extends State<ChatScreen>
   ChatMessage _buildWelcomeMessage() => ChatMessage(
         id: _uuid.v4(),
         role: MessageRole.assistant,
-        content: _mode == ChatMode.prePurchase
-            ? "Hi! 👋 I'm REVER, your shopping assistant. How can I help you today?\n\nYou can ask me about products, sizes, prices or availability."
-            : "Hello! I'm here to help you with your return. 📦\n\nTo get started, please tell me your **order email address** and **order number**.",
+        content: _s.welcomePrePurchase,
         timestamp: DateTime.now(),
       );
 
@@ -141,6 +143,43 @@ class _ChatScreenState extends State<ChatScreen>
     'comprar', 'cómpralo', 'compralo',
   ];
 
+  static const _returnTriggers = [
+    // English
+    'return', 'refund', 'send back', 'give back', 'exchange it',
+    'wrong size', 'wrong colour', 'wrong color', 'wrong item',
+    "doesn't fit", "don't fit", "didn't fit", 'too small', 'too big',
+    'too large', 'too tight', 'too loose', 'broken', 'damaged',
+    'defective', 'faulty', 'not what i ordered', 'not as described',
+    'return policy', 'how do i return',
+    // Spanish
+    'devolver', 'devolución', 'devolucion', 'reembolso', 'reembolsar',
+    'quiero devolver', 'necesito devolver', 'cambiar esto', 'me queda mal',
+    'no me queda', 'no me sirve', 'no me va', 'talla incorrecta',
+    'talla equivocada', 'está roto', 'esta roto', 'está dañado',
+    'esta dañado', 'defectuoso', 'no es lo que pedí', 'no es lo que pedi',
+    'política de devolución', 'politica de devolucion',
+    // French
+    'retourner', 'retour', 'remboursement', 'rembourser', 'rendre',
+    'ne me va pas', 'mauvaise taille', 'trop petit', 'trop grand',
+    'cassé', 'casse', 'défectueux', 'defectueux', 'pas ce que j\'ai commandé',
+    'politique de retour',
+    // German
+    'zurückschicken', 'rücksendung', 'ruckgabe', 'rückgabe', 'umtauschen',
+    'umtausch', 'passt nicht', 'falsche größe', 'falsche grosse',
+    'kaputt', 'defekt', 'beschädigt', 'rückerstattung', 'ruckerstattung',
+    // Portuguese
+    'devolver', 'devolução', 'devolucao', 'reembolso', 'trocar', 'troca',
+    'não serve', 'nao serve', 'tamanho errado', 'partido', 'defeituoso',
+    'política de devolução', 'como devolver',
+    // Italian
+    'restituire', 'reso', 'rimborso', 'rimborsare', 'cambiare',
+    'non va bene', 'non mi va', 'taglia sbagliata', 'rotto', 'difettoso',
+    'politica di reso', 'come restituire',
+    // Dutch
+    'retourneren', 'retour', 'terugbetaling', 'ruilen', 'past niet',
+    'verkeerde maat', 'kapot', 'defect', 'beschadigd', 'retourbeleid',
+  ];
+
   bool _isOfferTrigger(String text) {
     final lower = text.toLowerCase();
     return _offerTriggers.any((t) => lower.contains(t));
@@ -149,6 +188,19 @@ class _ChatScreenState extends State<ChatScreen>
   bool _isAddToCartTrigger(String text) {
     final lower = text.toLowerCase();
     return _addToCartTriggers.any((t) => lower.contains(t));
+  }
+
+  bool _isReturnTrigger(String text) {
+    final lower = text.toLowerCase();
+    return _returnTriggers.any((t) => lower.contains(t));
+  }
+
+  Future<void> _handleReturnTrigger() async {
+    print('[ChatScreen] Return intent detected -- redirecting to return flow');
+    _addBotMessage(_s.returnRedirectMessage);
+    await Future.delayed(const Duration(milliseconds: 800));
+    if (!mounted) return;
+    _switchToReturnMode();
   }
 
   Future<void> _handleOfferTrigger(String userQuery) async {
@@ -167,18 +219,14 @@ class _ChatScreenState extends State<ChatScreen>
       });
 
       if (product == null || !product.availableForSale) {
-        _addBotMessage(
-            "Sorry, I couldn't find any products on sale right now. "
-            "Feel free to ask me about any specific item!");
+        _addBotMessage(_s.noProductsFound);
         return;
       }
 
       _lastRecommendedProduct = product;
-      print('[ChatScreen] 💡 Offer card shown — product="${product.title}" variantId=${product.variantId}');
+      print('[ChatScreen] Offer card shown -- product="${product.title}" variantId=${product.variantId}');
 
-      _addBotMessage(product.isOnSale
-          ? "I found a great deal for you! 🎉"
-          : "Here's one of our top picks for you:");
+      _addBotMessage(product.isOnSale ? _s.foundDeal : _s.topPickIntro);
 
       final offerMsg = ChatMessage(
         id: _uuid.v4(),
@@ -190,7 +238,7 @@ class _ChatScreenState extends State<ChatScreen>
       setState(() => _messages.add(offerMsg));
       _scrollToBottom();
     } catch (e) {
-      print('[ChatScreen] ❌ fetchSaleProduct error: $e');
+      print('[ChatScreen] ERROR fetchSaleProduct: $e');
       setState(() {
         _messages.removeWhere((m) => m.isLoading);
         _isWaitingForBot = false;
@@ -202,15 +250,15 @@ class _ChatScreenState extends State<ChatScreen>
   Future<void> _handleAddToCartTrigger() async {
     final product = _lastRecommendedProduct;
     if (product == null) {
-      print('[ChatScreen] ℹ️ Add-to-cart trigger but no last product — showing offer card instead');
+      print('[ChatScreen] Add-to-cart trigger but no last product -- showing offer card instead');
       await _handleOfferTrigger(_lastOfferQuery.isEmpty ? 'recommend' : _lastOfferQuery);
       return;
     }
 
-    print('[ChatScreen] 🛒 Add-to-cart trigger — using last product "${product.title}" variantId=${product.variantId}');
+    print('[ChatScreen] Add-to-cart trigger -- using last product "${product.title}" variantId=${product.variantId}');
 
     // Show the offer card for the last recommended product so the user confirms
-    _addBotMessage('Here\'s the product I recommended — confirm to add it to your cart:');
+    _addBotMessage(_s.addToCartIntro);
     final offerMsg = ChatMessage(
       id: _uuid.v4(),
       role: MessageRole.assistant,
@@ -229,18 +277,26 @@ class _ChatScreenState extends State<ChatScreen>
     if (text.isEmpty || _isWaitingForBot) return;
 
     _textController.clear();
+    LanguageService().refineFromText(text);
     _addUserMessage(text);
+
+    // Return intent trigger: redirect to return flow
+    if (_mode == ChatMode.prePurchase && _isReturnTrigger(text)) {
+      print('[ChatScreen] Return trigger detected: "$text"');
+      await _handleReturnTrigger();
+      return;
+    }
 
     // Add-to-cart trigger: skip AI, show offer card for last product
     if (_mode == ChatMode.prePurchase && _isAddToCartTrigger(text)) {
-      print('[ChatScreen] 🛒 Add-to-cart trigger detected: "$text"');
+      print('[ChatScreen] Add-to-cart trigger detected: "$text"');
       await _handleAddToCartTrigger();
       return;
     }
 
     // Offer trigger: skip AI, fetch recommended product directly (faster)
     if (_mode == ChatMode.prePurchase && _isOfferTrigger(text)) {
-      print('[ChatScreen] 💡 Offer trigger detected: "$text"');
+      print('[ChatScreen] Offer trigger detected: "$text"');
       await _handleOfferTrigger(text);
       return;
     }
@@ -272,12 +328,12 @@ class _ChatScreenState extends State<ChatScreen>
       });
       _addBotMessage(response);
     } catch (e, stack) {
-      print('[ChatScreen] ❌ Unhandled exception in _sendMessage: $e\n$stack');
+      print('[ChatScreen] ERROR Unhandled exception in _sendMessage: $e\n$stack');
       setState(() {
         _messages.removeWhere((m) => m.isLoading);
         _isWaitingForBot = false;
       });
-      _addBotMessage('Sorry, something went wrong. Please try again.');
+      _addBotMessage(_s.genericError);
     }
   }
 
@@ -314,10 +370,10 @@ class _ChatScreenState extends State<ChatScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Start a new chat?', style: ReverTheme.headingMedium),
+                  Text(_s.resetDialogTitle, style: ReverTheme.headingMedium),
                   const SizedBox(height: 4),
                   Text(
-                    'This will clear the current conversation.',
+                    _s.resetDialogSubtitle,
                     style: ReverTheme.bodySmall,
                   ),
                 ],
@@ -331,7 +387,7 @@ class _ChatScreenState extends State<ChatScreen>
                   child: CupertinoButton(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     onPressed: () => Navigator.of(ctx).pop(false),
-                    child: Text('Cancel',
+                    child: Text(_s.resetDialogCancel,
                         style: ReverTheme.bodyRegular.copyWith(
                           color: ReverTheme.textSecondary,
                           fontWeight: FontWeight.w500,
@@ -343,7 +399,7 @@ class _ChatScreenState extends State<ChatScreen>
                   child: CupertinoButton(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     onPressed: () => Navigator.of(ctx).pop(true),
-                    child: Text('Clear',
+                    child: Text(_s.resetDialogConfirm,
                         style: ReverTheme.bodyRegular.copyWith(
                           color: ReverTheme.error,
                           fontWeight: FontWeight.w700,
@@ -446,7 +502,7 @@ class _ChatScreenState extends State<ChatScreen>
             ? CupertinoButton(
                 padding: EdgeInsets.zero,
                 onPressed: _switchToReturnMode,
-                child: Text('Returns',
+                child: Text(_s.navReturns,
                     style: ReverTheme.bodySmall.copyWith(
                       color: ReverTheme.accent,
                       fontWeight: FontWeight.w600,
@@ -482,7 +538,7 @@ class _ChatScreenState extends State<ChatScreen>
             const CupertinoActivityIndicator(
                 radius: 12, color: ReverTheme.accent),
             const SizedBox(height: 12),
-            Text('Loading…', style: ReverTheme.bodySmall),
+            Text(_s.loadingText, style: ReverTheme.bodySmall),
           ],
         ),
       );
@@ -504,6 +560,7 @@ class _ModeSwitcherBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(LanguageService().code);
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -520,7 +577,7 @@ class _ModeSwitcherBanner extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Already purchased? Start a return or exchange.',
+              s.bannerText,
               style: ReverTheme.bodySmall
                   .copyWith(color: ReverTheme.textPrimary),
             ),
@@ -529,7 +586,7 @@ class _ModeSwitcherBanner extends StatelessWidget {
             padding: EdgeInsets.zero,
             minimumSize: Size.zero,
             onPressed: onReturnTap,
-            child: Text('Start →',
+            child: Text(s.bannerCta,
                 style: ReverTheme.bodySmall.copyWith(
                   color: ReverTheme.accent,
                   fontWeight: FontWeight.w700,
@@ -556,6 +613,7 @@ class _InputBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(LanguageService().code);
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
       decoration: const BoxDecoration(
@@ -568,7 +626,7 @@ class _InputBar extends StatelessWidget {
           Expanded(
             child: CupertinoTextField(
               controller: controller,
-              placeholder: 'Ask about products…',
+              placeholder: s.inputPlaceholder,
               placeholderStyle: ReverTheme.bodyRegular
                   .copyWith(color: ReverTheme.textSecondary),
               padding:

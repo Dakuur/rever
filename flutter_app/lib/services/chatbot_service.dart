@@ -61,7 +61,7 @@ Rules:
   }) async {
     final apiKey = AppConfig.groqApiKey;
     if (apiKey.isEmpty) {
-      print('[Chatbot] ❌ GROQ_API_KEY is empty – pass --dart-define=GROQ_API_KEY=... at build time');
+      print('[Chatbot] ERROR GROQ_API_KEY is empty -- pass --dart-define=GROQ_API_KEY=... at build time');
       return 'Configuration error: API key not set. Please contact support.';
     }
 
@@ -108,14 +108,14 @@ Rules:
 
       if (response.statusCode != 200) {
         final errPreview = response.body.substring(0, response.body.length.clamp(0, 400));
-        print('[Chatbot]   ❌ Error body: $errPreview');
+        print('[Chatbot]   ERROR body: $errPreview');
         return 'Error ${response.statusCode} from AI service. Please try again.';
       }
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       final choices = json['choices'] as List<dynamic>? ?? [];
       if (choices.isEmpty) {
-        print('[Chatbot]   ⚠️ Empty choices array. Full body: ${response.body}');
+        print('[Chatbot]   WARN Empty choices array. Full body: ${response.body}');
         return 'I received an empty response. Please try again.';
       }
 
@@ -131,14 +131,14 @@ Rules:
       }
 
       if (content.trim().isEmpty) {
-        print('[Chatbot]   ⚠️ Content is empty despite finish_reason=$finishReason');
+        print('[Chatbot]   WARN Content is empty despite finish_reason=$finishReason');
         return 'I received an empty response. Please try again.';
       }
 
-      print('[Chatbot] ✅ Reply ready');
+      print('[Chatbot] Reply ready');
       return content;
     } catch (e, stack) {
-      print('[Chatbot] ❌ Exception: $e');
+      print('[Chatbot] ERROR Exception: $e');
       print('[Chatbot]   $stack');
       return 'Connection error: ${e.toString()}. Please try again.';
     }
@@ -153,7 +153,7 @@ Rules:
     final numbered = productTitles.asMap().entries
         .map((e) => '${e.key + 1}. ${e.value}')
         .join('\n');
-    print('[Chatbot] 🔍 identifyProduct — "$userDescription" vs ${productTitles.length} products');
+    print('[Chatbot] identifyProduct -- "$userDescription" vs ${productTitles.length} products');
     try {
       // Pass the prompt as a history entry so _callGroq includes it in the API call
       final reply = await _callGroq(
@@ -175,10 +175,10 @@ Rules:
       final numMatch = RegExp(r'\b(\d+)\b').firstMatch(reply.trim());
       final idx = numMatch != null ? (int.tryParse(numMatch.group(1)!) ?? 0) : 0;
       final matched = (idx > 0 && idx <= productTitles.length) ? productTitles[idx - 1] : 'no match';
-      print('[Chatbot] 🔍 identifyProduct → idx=$idx ("$matched") | raw reply: "${reply.trim()}"');
+      print('[Chatbot] identifyProduct -> idx=$idx ("$matched") | raw reply: "${reply.trim()}"');
       return idx;
     } catch (e) {
-      print('[Chatbot] ❌ identifyProduct error: $e');
+      print('[Chatbot] ERROR identifyProduct: $e');
       return 0;
     }
   }
@@ -197,7 +197,7 @@ Rules:
     try {
       productContext = await ShopifyService().buildProductContext(userMessage);
     } catch (e) {
-      print('[Chatbot]   ⚠️ Shopify product context failed: $e');
+      print('[Chatbot]   WARN Shopify product context failed: $e');
     }
     print('[Chatbot]   product context: ${productContext.isEmpty ? "none" : "${productContext.length} chars"}');
 

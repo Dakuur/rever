@@ -1,10 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:uuid/uuid.dart';
 
+import '../l10n/app_strings.dart';
 import '../models/chat_message.dart';
 import '../models/return_request.dart';
 import '../services/chatbot_service.dart';
 import '../services/firebase_service.dart';
+import '../services/language_service.dart';
 import '../services/order_service.dart';
 import '../theme/rever_theme.dart';
 import '../widgets/chat_bubble.dart';
@@ -51,6 +53,8 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
   String _returnReason = '';
   String? _conversationId;
 
+  AppStrings get _s => AppStrings.of(LanguageService().code);
+
   @override
   void initState() {
     super.initState();
@@ -65,14 +69,7 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
     } catch (_) {
       _conversationId = _uuid.v4();
     }
-    _addBot(
-      "Hi! I'm here to help with your return. 📦\n\n"
-      "Please share the following in one message:\n"
-      "• Your **email address**\n"
-      "• Your **order number** (e.g. #1001)\n"
-      "• The **product** you'd like to return\n\n"
-      "Example: *jane@example.com, #1001, blue snowboard*",
-    );
+    _addBot(_s.returnInitMessage);
   }
 
   // ── Message helpers ────────────────────────────────────────────────────────
@@ -123,6 +120,7 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
     final text = _textController.text.trim();
     if (text.isEmpty || !_inputEnabled) return;
     _textController.clear();
+    LanguageService().refineFromText(text);
     _addUser(text);
 
     switch (_step) {
@@ -169,15 +167,12 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
     }
 
     if (_customerEmail == null || _rawOrderId == null) {
-      _addBot(
-        "I need your **email**, **order number**, and **product name**.\n\n"
-        "Example: *jane@example.com, #1001, blue snowboard*",
-      );
+      _addBot(_s.missingInfoError);
       return;
     }
 
     if (_productQuery == null) {
-      _addBot("Got it! Which product would you like to return? Please describe it briefly.");
+      _addBot(_s.productQueryPrompt);
       return;
     }
 
@@ -203,11 +198,7 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
         _inputEnabled = true;
         _productQuery = null; // keep email+order, only retry product
       });
-      _addBot(
-        "I couldn't find **\"$failedQuery\"** in our catalog. "
-        "Could you describe the product differently? "
-        "(e.g. use the product name as it appears on your order confirmation)",
-      );
+      _addBot(_s.productNotFoundError(failedQuery ?? ''));
       return;
     }
 
@@ -217,12 +208,12 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
       _inputEnabled = true;
     });
 
-    _addBot(
-      "I found your order! 👍\n\n"
-      "**Order #${order.orderId}** — ${order.productTitle} (${order.productVariant})\n"
-      "Order total: ${order.formattedTotal}\n\n"
-      "Could you tell me why you'd like to return this item?",
-    );
+    _addBot(_s.orderFoundMessage(
+      orderId: order.orderId,
+      productTitle: order.productTitle,
+      productVariant: order.productVariant,
+      formattedTotal: order.formattedTotal,
+    ));
   }
 
   // ── Step: collect return reason ────────────────────────────────────────────
@@ -236,11 +227,13 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
     _showLoading();
 
     // AI generates one empathetic response, then we show the ladder
+    final langName = _s.languageName;
     String aiResponse;
     try {
       aiResponse = await _chatbotSvc.sendReturnMessage(
         userMessage:
             '[Order already verified — do NOT ask for email or order number.] '
+            'Respond in $langName. '
             'Customer: $_customerEmail | Order #${_order!.orderId} | '
             'Product: ${_order!.productTitle} (${_order!.productVariant}) | '
             'Price: ${_order!.formattedTotal}. '
@@ -250,15 +243,14 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
         history: [],
       );
     } catch (_) {
-      aiResponse =
-          "I understand, and I'm sorry to hear that. Let me find the best solution for you.";
+      aiResponse = _s.aiFallbackEmpathy;
     }
 
     _removeLoading();
     _addBot(aiResponse);
 
     await Future.delayed(const Duration(milliseconds: 500));
-    _addBot("Here's what we can do for you — let's start with the best option:");
+    _addBot(_s.ladderIntro);
 
     setState(() {
       _step = _FlowStep.ladder;
@@ -272,10 +264,7 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
   void _onExchangeAccepted() => _resolveReturn(ReturnResolution.sizeExchange);
 
   void _onExchangeDeclined() {
-    _addBot(
-      "No problem! Here's an even better alternative — "
-      "you'd actually come out ahead with this one:",
-    );
+    _addBot(_s.exchangeDeclinedMessage);
     setState(() => _ladderStep = LadderStep.giftCard);
     _scrollToBottom();
   }
@@ -283,7 +272,7 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
   void _onGiftCardAccepted() => _resolveReturn(ReturnResolution.giftCard);
 
   void _onGiftCardDeclined() {
-    _addBot("Understood. Here's the refund option:");
+    _addBot(_s.giftCardDeclinedMessage);
     setState(() => _ladderStep = LadderStep.refund);
     _scrollToBottom();
   }
@@ -313,9 +302,9 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
 
     try {
       await _firebaseSvc.saveReturnRequest(req);
-      print('[ReturnFlow] ✅ Saved to Firestore: ${req.id} resolution=${resolution.name}');
+      print('[ReturnFlow] Saved to Firestore: ${req.id} resolution=${resolution.name}');
     } catch (e) {
-      print('[ReturnFlow] ❌ Firestore save failed: $e');
+      print('[ReturnFlow] ERROR Firestore save failed: $e');
     }
 
     final confirmationMsg = _buildConfirmation(resolution, req.id);
@@ -325,24 +314,17 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
 
   String _buildConfirmation(ReturnResolution resolution, String refId) {
     final shortRef = 'RTN-${refId.substring(0, 8).toUpperCase()}';
+    final email = _customerEmail ?? '';
     switch (resolution) {
       case ReturnResolution.sizeExchange:
-        return "Your exchange request is confirmed! ✅\n\n"
-            "Our team will contact you at **$_customerEmail** within 24h "
-            "to arrange the new size or colour.\n\n"
-            "Reference: **$shortRef**";
+        return _s.confirmationExchange(email, shortRef);
       case ReturnResolution.giftCard:
-        return "Your store credit is on its way! 🎁\n\n"
-            "**${_order?.formattedGiftCard ?? ''}** will be sent to "
-            "**$_customerEmail** within 24h.\n\n"
-            "Reference: **$shortRef**";
+        return _s.confirmationGiftCard(
+            _order?.formattedGiftCard ?? '', email, shortRef);
       case ReturnResolution.refund:
-        return "Refund submitted. 💳\n\n"
-            "**${_order?.formattedTotal ?? ''}** will be returned to your "
-            "original payment method in 3–5 business days.\n\n"
-            "Reference: **$shortRef**";
+        return _s.confirmationRefund(_order?.formattedTotal ?? '', shortRef);
       default:
-        return "Your request has been submitted. Reference: **$shortRef**";
+        return '${_s.confirmationDefault} Reference: **$shortRef**';
     }
   }
 
@@ -399,7 +381,7 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            Text('Returns & Exchanges', style: ReverTheme.headingMedium),
+            Text(_s.returnNavTitle, style: ReverTheme.headingMedium),
           ],
         ),
       ),
@@ -426,9 +408,9 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
                 onSend: _onSend,
                 placeholder: _step == _FlowStep.collectInfo
                     ? (_customerEmail != null && _rawOrderId != null
-                        ? 'Product name…'
-                        : 'Email, order number & product…')
-                    : 'Describe the reason…',
+                        ? _s.returnPlaceholderProduct
+                        : _s.returnPlaceholderInfo)
+                    : _s.returnPlaceholderReason,
               ),
           ],
         ),

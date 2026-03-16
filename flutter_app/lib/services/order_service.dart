@@ -44,7 +44,7 @@ class OrderService {
     final validEmail = email.contains('@') && email.contains('.');
 
     if (cleanId.isEmpty || !validEmail) {
-      print('[OrderService] ❌ Invalid input — id="$orderId" email="$email"');
+      print('[OrderService] ERROR Invalid input -- id="$orderId" email="$email"');
       return null;
     }
 
@@ -53,7 +53,7 @@ class OrderService {
     // Fetch full catalog from Shopify
     final products = await ShopifyService().getAllProducts();
     if (products.isEmpty) {
-      print('[OrderService] ❌ Shopify catalog returned 0 products');
+      print('[OrderService] ERROR Shopify catalog returned 0 products');
       return null;
     }
 
@@ -62,12 +62,12 @@ class OrderService {
     final idx = await ChatbotService().identifyProduct(productQuery, titles);
 
     if (idx == 0 || idx > products.length) {
-      print('[OrderService] ❌ No catalog match for: "$productQuery"');
+      print('[OrderService] ERROR No catalog match for: "$productQuery"');
       return null;
     }
 
     final product = products[idx - 1];
-    print('[OrderService] ✅ Matched "${product.title}" — '
+    print('[OrderService] Matched "${product.title}" -- '
         '${product.price} ${product.currencyCode}');
 
     return ValidatedOrder(

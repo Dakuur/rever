@@ -19,16 +19,16 @@ class _ProductOfferCardState extends State<ProductOfferCard> {
 
   Future<void> _addToCart() async {
     final variantId = widget.product.variantId;
-    print('[OfferCard] 👍 User tapped "Yes, add to cart" — '
+    print('[OfferCard] User tapped "Yes, add to cart" -- '
         'product="${widget.product.title}" variantId=$variantId');
     if (variantId == null) {
-      print('[OfferCard] ❌ variantId is null, cannot add to cart');
+      print('[OfferCard] ERROR variantId is null, cannot add to cart');
       setState(() => _state = _CardState.error);
       return;
     }
     setState(() => _state = _CardState.loading);
     final ok = await ShopifyService().createOrAddToCart(variantId);
-    print('[OfferCard] ${ok ? '✅ Added to cart' : '❌ Failed to add to cart'} — '
+    print('[OfferCard] ${ok ? 'Added to cart' : 'ERROR Failed to add to cart'} -- '
         'product="${widget.product.title}" variantId=$variantId');
     setState(() => _state = ok ? _CardState.success : _CardState.error);
   }
@@ -228,7 +228,7 @@ class _ProductOfferCardState extends State<ProductOfferCard> {
                 Expanded(
                   child: GestureDetector(
                     onTap: () {
-                      print('[OfferCard] 👎 User tapped "No, thanks" — product="${widget.product.title}"');
+                      print('[OfferCard] User tapped "No, thanks" -- product="${widget.product.title}"');
                       setState(() => _state = _CardState.dismissed);
                     },
                     child: Container(

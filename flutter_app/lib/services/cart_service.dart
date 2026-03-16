@@ -45,7 +45,7 @@ class CartService {
         final totalCents = _cartData?['total_price'] as int? ?? 0;
         final total = totalCents / 100;
         final cur = _cartData?['currency'] as String? ?? 'EUR';
-        print('[CartService] ✅ Cart received: $itemCount items | $cur ${total.toStringAsFixed(2)}');
+        print('[CartService] Cart received: $itemCount items | $cur ${total.toStringAsFixed(2)}');
         final items = (_cartData?['items'] as List<dynamic>?) ?? [];
         for (final item in items) {
           final i = item as Map<String, dynamic>;
@@ -56,11 +56,11 @@ class CartService {
               'x${i['quantity']} @ $cur ${((i['price'] as int? ?? 0) / 100).toStringAsFixed(2)}');
         }
       } catch (e) {
-        print('[CartService] ❌ Error parsing cart message: $e');
+        print('[CartService] ERROR parsing cart message: $e');
       }
     });
 
-    print('[CartService] 🎧 Listening for cart postMessage from Shopify parent');
+    print('[CartService] Listening for cart postMessage from Shopify parent');
   }
 
   int get itemCount => (_cartData?['item_count'] as int?) ?? 0;
@@ -71,7 +71,7 @@ class CartService {
   String buildCartContext() {
     final cart = _cartData;
     if (cart == null || itemCount == 0) {
-      print('[CartService] 📭 Cart empty or not yet received from parent page');
+      print('[CartService] Cart empty or not yet received from parent page');
       return '';
     }
 
@@ -93,7 +93,7 @@ class CartService {
       buf.writeln('  - $title$variantSuffix x$qty @ $currency ${price.toStringAsFixed(2)}');
     }
 
-    print('[CartService] ✅ Cart context built: $itemCount items, $currency ${total.toStringAsFixed(2)}');
+    print('[CartService] Cart context built: $itemCount items, $currency ${total.toStringAsFixed(2)}');
     return buf.toString();
   }
 }

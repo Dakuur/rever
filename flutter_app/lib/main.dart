@@ -5,10 +5,12 @@ import 'package:flutter/cupertino.dart';
 import 'firebase_options.dart';
 import 'models/chat_message.dart';
 import 'screens/chat_screen.dart';
+import 'services/language_service.dart';
 import 'theme/rever_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  LanguageService().init();
 
   try {
     await Firebase.initializeApp(

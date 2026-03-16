@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
+import '../l10n/app_strings.dart';
+import '../services/language_service.dart';
 import '../services/order_service.dart';
 import '../theme/rever_theme.dart';
 
@@ -69,49 +71,49 @@ class _IncentiveStepCardState extends State<IncentiveStepCard>
 
   _StepContent get _content {
     final o = widget.order;
+    final s = AppStrings.of(LanguageService().code);
+    final extraAmount = (o.giftCardValue - o.total).toStringAsFixed(2);
     switch (widget.step) {
       case LadderStep.exchange:
         return _StepContent(
           icon: CupertinoIcons.arrow_2_squarepath,
           iconBg: ReverTheme.accentLight,
           iconColor: ReverTheme.accent,
-          title: 'Size or Colour Exchange',
-          subtitle: 'Free, instant — no questions asked',
-          body:
-              'We\'ll swap your ${o.productTitle} (${o.productVariant}) for any '
-              'other available size or colour.',
-          acceptLabel: 'Accept Exchange',
-          declineLabel: 'I\'d prefer something else',
-          confirmedText: 'Exchange requested! ✓',
+          title: s.exchangeTitle,
+          subtitle: s.exchangeSubtitle,
+          body: s.exchangeBody(o.productTitle, o.productVariant),
+          acceptLabel: s.exchangeAcceptLabel,
+          declineLabel: s.exchangeDeclineLabel,
+          confirmedText: s.exchangeConfirmedText,
         );
       case LadderStep.giftCard:
         return _StepContent(
           icon: CupertinoIcons.gift,
           iconBg: const Color(0xFFFFF3E0),
           iconColor: const Color(0xFFFF9F0A),
-          title: 'Store Credit + 10% Bonus',
-          subtitle: 'Worth more than a standard refund',
-          body:
-              'Instead of ${o.formattedTotal} back to your card, get '
-              '${o.formattedGiftCard} in store credit — that\'s '
-              '${o.giftCardValue.toStringAsFixed(2) != o.total.toStringAsFixed(2) ? (o.giftCardValue - o.total).toStringAsFixed(2) : ''} '
-              '${o.currency} extra.',
-          acceptLabel: 'Accept Store Credit',
-          declineLabel: 'I want a cash refund',
-          confirmedText: 'Store credit on its way! ✓',
+          title: s.giftCardTitle,
+          subtitle: s.giftCardSubtitle,
+          body: s.giftCardBody(
+            formattedTotal: o.formattedTotal,
+            formattedGiftCard: o.formattedGiftCard,
+            extraAmount: extraAmount,
+            currency: o.currency,
+          ),
+          acceptLabel: s.giftCardAcceptLabel,
+          declineLabel: s.giftCardDeclineLabel,
+          confirmedText: s.giftCardConfirmedText,
         );
       case LadderStep.refund:
         return _StepContent(
           icon: CupertinoIcons.creditcard,
           iconBg: const Color(0xFFFFEBEE),
           iconColor: ReverTheme.error,
-          title: 'Refund to Original Payment',
-          subtitle: '3–5 business days',
-          body:
-              '${o.formattedTotal} will be returned to your original payment method.',
-          acceptLabel: 'Confirm Refund',
+          title: s.refundTitle,
+          subtitle: s.refundSubtitle,
+          body: s.refundBody(o.formattedTotal),
+          acceptLabel: s.refundAcceptLabel,
           declineLabel: null,
-          confirmedText: 'Refund submitted ✓',
+          confirmedText: s.refundConfirmedText,
         );
     }
   }
@@ -197,7 +199,7 @@ class _IncentiveStepCardState extends State<IncentiveStepCard>
             Text(
               _status == _CardStatus.confirmed
                   ? _content.confirmedText
-                  : 'Got it, showing next option…',
+                  : AppStrings.of(LanguageService().code).cardDecliningText,
               style: ReverTheme.bodySmall.copyWith(
                 color: _status == _CardStatus.confirmed
                     ? ReverTheme.success

@@ -62,7 +62,7 @@ query SearchProducts($query: String!, $first: Int!) {
 
     print('[ShopifyService] HTTP ${res.statusCode}');
     if (res.statusCode != 200) {
-      print('[ShopifyService] ❌ Error body: ${res.body.substring(0, res.body.length.clamp(0, 300))}');
+      print('[ShopifyService] ERROR body: ${res.body.substring(0, res.body.length.clamp(0, 300))}');
       return [];
     }
     final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -226,19 +226,19 @@ query GetRecommendedProduct($query: String!, $reverse: Boolean!) {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       final edges = (data['data']?['products']?['edges'] as List<dynamic>?) ?? [];
       if (edges.isEmpty) {
-        print('[ShopifyService] fetchRecommendedProduct (q="$q") → no products');
+        print('[ShopifyService] fetchRecommendedProduct (q="$q") -> no products');
         continue;
       }
       final product = ShopifyProduct.fromGraphQL(
           (edges.first['node'] as Map<String, dynamic>?) ?? {});
-      print('[ShopifyService] fetchRecommendedProduct → '
+      print('[ShopifyService] fetchRecommendedProduct -> '
           'title="${product.title}" variantId=${product.variantId} '
           'price=${product.price} ${product.currencyCode} '
           'isOnSale=${product.isOnSale} availableForSale=${product.availableForSale}');
       if (product.variantId != null) return product;
-      print('[ShopifyService] ⚠️ variantId is null — skipping');
+      print('[ShopifyService] WARN variantId is null -- skipping');
     }
-    print('[ShopifyService] ❌ fetchRecommendedProduct exhausted all queries');
+    print('[ShopifyService] ERROR fetchRecommendedProduct exhausted all queries');
     return null;
   }
 
@@ -247,7 +247,7 @@ query GetRecommendedProduct($query: String!, $reverse: Boolean!) {
   /// Waits for a rever:cartAddResult response (max 6 s) before resolving.
   Future<bool> createOrAddToCart(String variantGid) async {
     final numericId = variantGid.split('/').last;
-    print('[ShopifyService] 🛒 postMessage → rever:addToCart variantId=$numericId');
+    print('[ShopifyService] postMessage -> rever:addToCart variantId=$numericId');
 
     final completer = Completer<bool>();
     StreamSubscription? sub;
@@ -261,7 +261,7 @@ query GetRecommendedProduct($query: String!, $reverse: Boolean!) {
         sub?.cancel();
         final success = msg['success'] as bool? ?? false;
         final error = msg['error'] as String?;
-        if (error != null) print('[ShopifyService] ❌ cart/add.js: $error');
+        if (error != null) print('[ShopifyService] ERROR cart/add.js: $error');
         if (!completer.isCompleted) completer.complete(success);
       } catch (_) {}
     });
@@ -273,7 +273,7 @@ query GetRecommendedProduct($query: String!, $reverse: Boolean!) {
       );
     } catch (e) {
       sub.cancel();
-      print('[ShopifyService] ❌ postMessage send failed: $e');
+      print('[ShopifyService] ERROR postMessage send failed: $e');
       return false;
     }
 
@@ -281,7 +281,7 @@ query GetRecommendedProduct($query: String!, $reverse: Boolean!) {
       const Duration(seconds: 6),
       onTimeout: () {
         sub?.cancel();
-        print('[ShopifyService] ⚠️ No response from parent page (timeout)');
+        print('[ShopifyService] WARN No response from parent page (timeout)');
         return false;
       },
     );

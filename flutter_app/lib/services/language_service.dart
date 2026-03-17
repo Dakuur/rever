@@ -38,6 +38,13 @@ class LanguageService {
   /// Current ISO-639-1 language code (e.g. 'en', 'es', 'fr').
   String get code => _code;
 
+  /// Resets detection state. For use in tests only.
+  // ignore: invalid_use_of_visible_for_testing_member
+  void resetForTesting() {
+    _code = 'en';
+    _refinedFromText = false;
+  }
+
   // ── Heuristic text detection ──────────────────────────────────────────────
 
   String? _detectFromText(String text) {

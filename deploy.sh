@@ -20,6 +20,27 @@ fi
 
 echo "[OK] Keys validated"
 
+# -- Run tests ----------------------------------------------------------------
+echo "[TEST] Running Flutter unit tests (models, services, config)..."
+cd flutter_app
+flutter test test/models/ test/services/ test/config/ test/widget_test.dart --reporter=compact
+if [ $? -ne 0 ]; then
+  echo "[FAIL] Flutter tests failed — deploy aborted."
+  exit 1
+fi
+cd ..
+echo "[OK] Flutter tests passed"
+
+echo "[TEST] Running Node.js tests..."
+cd rever-chatbot
+npm test
+if [ $? -ne 0 ]; then
+  echo "[FAIL] Node.js tests failed — deploy aborted."
+  exit 1
+fi
+cd ..
+echo "[OK] Node.js tests passed"
+
 # -- Build --------------------------------------------------------------------
 echo "[BUILD] Building Flutter Web..."
 cd flutter_app

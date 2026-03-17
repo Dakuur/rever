@@ -62,10 +62,10 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              const Text('REVER Assistant',
+              Text('REVER Assistant',
                   style: ReverTheme.headingLarge),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Sign in to save your conversation history\nand track your returns.',
                 style: ReverTheme.bodySmall,
                 textAlign: TextAlign.center,

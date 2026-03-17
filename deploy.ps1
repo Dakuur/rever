@@ -47,7 +47,38 @@ $tokenPreview = $env_vars['SHOPIFY_STOREFRONT_PUBLIC_TOKEN'].Substring(0, [Math]
 Write-Host "     Token : ${tokenPreview}..."
 Write-Host ""
 
-# -- 3. Flutter build ------------------------------------------
+# -- 3. Run tests ----------------------------------------------
+Write-Host "[TEST] Running test suite before deploy..." -ForegroundColor Cyan
+
+$FlutterAppDir = Join-Path $RootDir "flutter_app"
+$ChatbotDir = Join-Path $RootDir "rever-chatbot"
+
+# Flutter unit tests (VM-compatible: models, services, config)
+Write-Host "[TEST] Running Flutter unit tests..." -ForegroundColor Cyan
+Push-Location $FlutterAppDir
+& flutter test test/models/ test/services/ test/config/ test/widget_test.dart --reporter=compact
+if ($LASTEXITCODE -ne 0) {
+    Pop-Location
+    Write-Error "Flutter tests FAILED (exit code $LASTEXITCODE) — deploy aborted."
+    exit 1
+}
+Pop-Location
+Write-Host "[OK] Flutter tests passed" -ForegroundColor Green
+
+# Node.js tests
+Write-Host "[TEST] Running Node.js tests..." -ForegroundColor Cyan
+Push-Location $ChatbotDir
+& npm test
+if ($LASTEXITCODE -ne 0) {
+    Pop-Location
+    Write-Error "Node.js tests FAILED (exit code $LASTEXITCODE) — deploy aborted."
+    exit 1
+}
+Pop-Location
+Write-Host "[OK] Node.js tests passed" -ForegroundColor Green
+Write-Host ""
+
+# -- 4. Flutter build ------------------------------------------
 if (-not $SkipBuild) {
     Write-Host "[BUILD] Building Flutter Web..." -ForegroundColor Cyan
 
@@ -70,7 +101,7 @@ if (-not $SkipBuild) {
     Write-Host ""
 }
 
-# -- 4. Firebase deploy ----------------------------------------
+# -- 5. Firebase deploy ----------------------------------------
 if (-not $SkipDeploy) {
     Write-Host "[DEPLOY] Deploying to Firebase Hosting..." -ForegroundColor Cyan
 

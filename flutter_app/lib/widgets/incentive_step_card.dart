@@ -2,10 +2,10 @@ import 'package:flutter/cupertino.dart';
 
 import '../l10n/app_strings.dart';
 import '../services/language_service.dart';
-import '../services/order_service.dart';
+import '../models/validated_order.dart';
 import '../theme/rever_theme.dart';
 
-enum LadderStep { exchange, giftCard, refund }
+enum LadderStep { exchange, giftCard, upsell, refund }
 
 /// A single step in the returns incentive ladder.
 ///
@@ -102,6 +102,18 @@ class _IncentiveStepCardState extends State<IncentiveStepCard>
           acceptLabel: s.giftCardAcceptLabel,
           declineLabel: s.giftCardDeclineLabel,
           confirmedText: s.giftCardConfirmedText,
+        );
+      case LadderStep.upsell:
+        return _StepContent(
+          icon: CupertinoIcons.star,
+          iconBg: const Color(0xFFE8F5E9),
+          iconColor: ReverTheme.success,
+          title: s.upsellTitle,
+          subtitle: s.upsellSubtitle,
+          body: s.upsellBody(o.productTitle),
+          acceptLabel: s.upsellAcceptLabel,
+          declineLabel: s.upsellDeclineLabel,
+          confirmedText: s.upsellConfirmedText,
         );
       case LadderStep.refund:
         return _StepContent(

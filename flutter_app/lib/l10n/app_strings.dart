@@ -244,6 +244,16 @@ class AppStrings {
             "Voorbeeld: *jane@example.com, #1001, blauwe snowboard*",
       );
 
+  String get orderNumberInvalidError => _pick(
+        en: "That order number doesn't appear to be valid. Please double-check and try again.",
+        es: "Ese número de pedido no parece válido. Por favor, verifícalo e inténtalo de nuevo.",
+        fr: "Ce numéro de commande ne semble pas valide. Veuillez vérifier et réessayer.",
+        de: "Diese Bestellnummer scheint nicht gültig zu sein. Bitte überprüfen Sie sie und versuchen Sie es erneut.",
+        pt: "Esse número de pedido não parece válido. Por favor, verifique e tente novamente.",
+        it: "Questo numero d'ordine non sembra valido. Per favore, verificalo e riprova.",
+        nl: "Dat bestelnummer lijkt niet geldig te zijn. Controleer het en probeer het opnieuw.",
+      );
+
   String get missingInfoError => _pick(
         en: "I need your **email**, **order number**, and **product name**.\n\n"
             "Example: *jane@example.com, #1001, blue snowboard*",
@@ -621,6 +631,107 @@ class AppStrings {
         pt: "Crédito de loja a caminho! ✓",
         it: "Credito in negozio in arrivo! ✓",
         nl: "Winkelkrediet is onderweg! ✓",
+      );
+
+  String get upsellTitle => _pick(
+        en: "Try Something New",
+        es: "Prueba algo nuevo",
+        fr: "Essayez autre chose",
+        de: "Probieren Sie etwas Neues",
+        pt: "Experimente algo novo",
+        it: "Prova qualcosa di nuovo",
+        nl: "Probeer iets nieuws",
+      );
+
+  String get upsellSubtitle => _pick(
+        en: "Apply your return credit toward a better fit",
+        es: "Usa tu crédito de devolución para algo mejor",
+        fr: "Utilisez votre crédit de retour pour un meilleur choix",
+        de: "Verwenden Sie Ihr Rückgabeguthaben für etwas Passenderes",
+        pt: "Use o seu crédito de devolução para algo melhor",
+        it: "Usa il tuo credito reso per qualcosa di più adatto",
+        nl: "Gebruik uw retourkrediet voor een betere keuze",
+      );
+
+  String upsellBody(String productTitle) => _pick(
+        en: "Not happy with $productTitle? Use your return value to pick any other item from our catalog — same value, no extra cost.",
+        es: "¿No estás satisfecho con $productTitle? Usa el valor de tu devolución para elegir otro artículo del catálogo — mismo valor, sin coste adicional.",
+        fr: "Pas satisfait de $productTitle ? Utilisez la valeur de votre retour pour choisir un autre article du catalogue — même valeur, sans frais supplémentaires.",
+        de: "Nicht zufrieden mit $productTitle? Nutzen Sie den Rückgabewert für einen anderen Artikel aus unserem Katalog — gleicher Wert, keine Extrakosten.",
+        pt: "Não está satisfeito com $productTitle? Use o valor da devolução para escolher outro artigo do catálogo — mesmo valor, sem custo extra.",
+        it: "Non sei soddisfatto di $productTitle? Usa il valore del reso per scegliere un altro articolo dal catalogo — stesso valore, nessun costo extra.",
+        nl: "Niet tevreden met $productTitle? Gebruik de retourwaarde voor een ander artikel uit onze catalogus — zelfde waarde, geen extra kosten.",
+      );
+
+  String get upsellAcceptLabel => _pick(
+        en: "Browse Alternatives",
+        es: "Ver alternativas",
+        fr: "Voir les alternatives",
+        de: "Alternativen ansehen",
+        pt: "Ver alternativas",
+        it: "Vedi alternative",
+        nl: "Alternatieven bekijken",
+      );
+
+  String get upsellDeclineLabel => _pick(
+        en: "I'd prefer a refund",
+        es: "Prefiero el reembolso",
+        fr: "Je préfère un remboursement",
+        de: "Ich möchte lieber eine Rückerstattung",
+        pt: "Prefiro o reembolso",
+        it: "Preferisco il rimborso",
+        nl: "Ik wil liever een terugbetaling",
+      );
+
+  String get upsellConfirmedText => _pick(
+        en: "Great choice! ✓",
+        es: "¡Buena elección! ✓",
+        fr: "Excellent choix ! ✓",
+        de: "Tolle Wahl! ✓",
+        pt: "Ótima escolha! ✓",
+        it: "Ottima scelta! ✓",
+        nl: "Geweldige keuze! ✓",
+      );
+
+  String get upsellDeclinedMessage => _pick(
+        en: "No problem. Here's the refund option:",
+        es: "Sin problema. Aquí está la opción de reembolso:",
+        fr: "Pas de problème. Voici l'option de remboursement :",
+        de: "Kein Problem. Hier ist die Rückerstattungsoption:",
+        pt: "Sem problema. Aqui está a opção de reembolso:",
+        it: "Nessun problema. Ecco l'opzione di rimborso:",
+        nl: "Geen probleem. Hier is de terugbetalingsoptie:",
+      );
+
+  String confirmationUpsell(String email, String shortRef) => _pick(
+        en: "Your store credit is reserved! 🛍️\n\n"
+            "Browse our catalog and use your credit at checkout. "
+            "A confirmation will be sent to **$email**.\n\n"
+            "Reference: **$shortRef**",
+        es: "¡Tu crédito en tienda está reservado! 🛍️\n\n"
+            "Explora nuestro catálogo y usa tu crédito al pagar. "
+            "Se enviará una confirmación a **$email**.\n\n"
+            "Referencia: **$shortRef**",
+        fr: "Votre crédit boutique est réservé ! 🛍️\n\n"
+            "Parcourez notre catalogue et utilisez votre crédit à la caisse. "
+            "Une confirmation sera envoyée à **$email**.\n\n"
+            "Référence : **$shortRef**",
+        de: "Ihr Guthaben ist reserviert! 🛍️\n\n"
+            "Stöbern Sie in unserem Katalog und nutzen Sie Ihr Guthaben beim Checkout. "
+            "Eine Bestätigung wird an **$email** gesendet.\n\n"
+            "Referenz: **$shortRef**",
+        pt: "O seu crédito de loja está reservado! 🛍️\n\n"
+            "Explore o catálogo e use o crédito na finalização da compra. "
+            "Uma confirmação será enviada para **$email**.\n\n"
+            "Referência: **$shortRef**",
+        it: "Il tuo credito in negozio è riservato! 🛍️\n\n"
+            "Sfoglia il catalogo e usa il credito al checkout. "
+            "Una conferma verrà inviata a **$email**.\n\n"
+            "Riferimento: **$shortRef**",
+        nl: "Uw winkelkrediet is gereserveerd! 🛍️\n\n"
+            "Blader door onze catalogus en gebruik uw krediet bij het afrekenen. "
+            "Een bevestiging wordt verzonden naar **$email**.\n\n"
+            "Referentie: **$shortRef**",
       );
 
   String get refundTitle => _pick(

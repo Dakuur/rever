@@ -117,6 +117,35 @@ The floating chat bubble will now appear on all storefront pages.
 
 ---
 
+## Testing
+
+### Run unit tests (Flutter – VM)
+
+```bash
+cd flutter_app
+flutter test test/models/ test/services/ test/config/
+```
+
+### Run widget tests (Flutter – requires Chrome)
+
+```bash
+cd flutter_app
+flutter test test/widgets/ --platform chrome
+```
+
+### Run Node.js / Shopify app tests
+
+```bash
+cd rever-chatbot
+npm test
+```
+
+**216 Flutter unit tests** cover models, services, config, and localisation across 7 languages. **43 Node.js tests** cover webhook handlers, Prisma singleton, the Liquid extension, and the app TOML config. Widget tests cover chat bubbles, product cards, and the incentive ladder.
+
+The deploy scripts (`deploy.ps1` / `deploy.sh`) run the Flutter and Node.js unit tests automatically before building; a failing test aborts the deploy. CI runs the full suite (including Chrome widget tests) on every push via `.github/workflows/tests.yml`.
+
+---
+
 ## Development
 
 To run the Flutter app locally:
@@ -152,13 +181,17 @@ Shopify storefront
 
 All API keys are injected at Flutter build time via `--dart-define` and are never stored in source code.
 
+### Order number validation
+
+Before proceeding with the return flow, the app calls a Firebase Cloud Function (`verifyOrderNumber`) written in JavaScript. The function receives the order number and checks whether it is a prime number, returning `{ isValid: bool, orderId: string }`. Only prime order numbers are accepted (e.g. 1031, 1033, 1039). This is a simulation of a real order validation check against a backend database — in a production app the same function would query Shopify's Orders API instead.
+
 ## Future improvements / Known limitations
 
 - Multi-model support: Dynamically switch between different AI models based on query type (e.g. smaller model for simple FAQs, larger model for complex queries).
 - Slow load times: Flutter Web is heavy, leading to slow initial load. Consider a lighter frontend framework or optimizing Flutter build.
 - Better AI model: Models as Gemini 2.5 flash are available for free, but limited to a few requests per day. A paid API key for a more powerful model (e.g. Gemini 3.3) would improve response quality and allow more interactions.
 - More robust return flow: The current return flow is basic and could be expanded with more options (e.g. schedule a pickup, better handling of edge cases like partial refunds, damaged items, etc.).
-- Database checking: The app currently does not check for return requests in the database, which could lead to duplicate requests or unverified returns.
+- Real order validation: The Cloud Function currently uses a prime number check as a stand-in for real order verification. Integrating with Shopify's Orders API would replace this with actual order lookups.
 - Product handling fixes: The model often recommends sold out products, or can't detect sales and discounts. Better integration with the Shopify API and more robust prompt engineering could help with this.
 - Real e-mail sending: The app currently simulates sending return confirmation emails. Integrating a real email service would make the return flow more realistic and functional.
 
@@ -175,6 +208,7 @@ All API keys are injected at Flutter build time via `--dart-define` and are neve
 | UI redesign, alligned with Rever colors and overall style                              | 0.5        | 6.5               |
 | Add to cart suggestion and refund flow upgrade. Added multi-language support           | 1          | 7.5               |
 | Documenting and deploy fixing for easy app deployment recreation                       | 0.5        | 8                 |
+| Added tests and Order Number verification in Firebase in the return flow               | 0.5        | 8.5               |
 
 ## Screenshots
 

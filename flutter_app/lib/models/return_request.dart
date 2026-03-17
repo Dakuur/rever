@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum ReturnResolution { sizeExchange, giftCard, refund, pending }
+enum ReturnResolution { sizeExchange, giftCard, upsell, refund, pending }
 
 class ReturnRequest {
   final String id;

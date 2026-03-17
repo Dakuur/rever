@@ -6,6 +6,7 @@ import '../models/chat_message.dart';
 import '../models/return_request.dart';
 import '../services/chatbot_service.dart';
 import '../services/firebase_service.dart';
+import '../services/functions_service.dart';
 import '../services/language_service.dart';
 import '../services/order_service.dart';
 import '../theme/rever_theme.dart';
@@ -38,6 +39,7 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
   final _chatbotSvc = ChatbotService();
   final _firebaseSvc = FirebaseService();
   final _orderSvc = OrderService();
+  final _functionsSvc = FunctionsService();
   final _uuid = const Uuid();
 
   final List<ChatMessage> _messages = [];
@@ -46,6 +48,7 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
   bool _inputEnabled = true;
 
   // Collected data
+  bool _orderVerified = false;
   String? _customerEmail;
   String? _rawOrderId;
   String? _productQuery;
@@ -138,19 +141,28 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
   // ── Step: collect email + order ID ─────────────────────────────────────────
 
   Future<void> _handleCollectInfo(String text) async {
+    print('[CollectInfo] input: "$text"');
+    print('[CollectInfo] state before: email=$_customerEmail orderId=$_rawOrderId product=$_productQuery');
+
     final emailRegex = RegExp(r'[\w.+-]+@[\w.-]+\.\w+');
-    final orderRegex = RegExp(r'#?\d{3,}');
+    final orderRegex = RegExp(r'#?\d{2,}');
 
     // If we already have email+order, this reply is the product description
     if (_customerEmail != null && _rawOrderId != null && _productQuery == null) {
       _productQuery = text.trim();
+      print('[CollectInfo] product set from follow-up reply: "$_productQuery"');
     } else {
       final emailMatch = emailRegex.firstMatch(text);
       final orderMatch = orderRegex.firstMatch(text);
+
+      print('[CollectInfo] email regex match: ${emailMatch?.group(0)}');
+      print('[CollectInfo] order regex match: ${orderMatch?.group(0)}');
+
       if (emailMatch != null) _customerEmail = emailMatch.group(0);
       if (orderMatch != null) {
         _rawOrderId = orderMatch.group(0)?.replaceFirst('#', '');
       }
+
       // Extract product: text minus email and order number
       if (_customerEmail != null && _rawOrderId != null) {
         final remaining = text
@@ -158,25 +170,65 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
             .replaceAll(orderRegex, '')
             .replaceAll(RegExp(r'[#,]'), '')
             .replaceAll(RegExp(
-                r'\b(order|pedido|número|numero|email|correo|quiero|devolver|return|my|mi|the|y|and)\b',
+                r'\b(order|pedido|número|numero|codigo|código|email|correo|quiero|devolver|return|producto|product|article|artikel|articulo|artículo|my|mi|the|el|la|y|and|avec|avec|con|de|du|und|met|het|com|meu|minha|il|lo|un|una|une|ein|eine)\b',
                 caseSensitive: false), '')
             .replaceAll(RegExp(r'\s+'), ' ')
             .trim();
+        print('[CollectInfo] remaining after stripping email+order+keywords: "$remaining"');
         if (remaining.length > 2) _productQuery = remaining;
       }
     }
 
+    print('[CollectInfo] state after parse: email=$_customerEmail orderId=$_rawOrderId product=$_productQuery');
+
     if (_customerEmail == null || _rawOrderId == null) {
+      print('[CollectInfo] missing email or orderId, asking again');
       _addBot(_s.missingInfoError);
       return;
     }
 
     if (_productQuery == null) {
+      print('[CollectInfo] missing product, asking for it');
       _addBot(_s.productQueryPrompt);
       return;
     }
 
-    // Have all three — validate
+    // Verify order number via Cloud Function (blocking: only prime numbers pass).
+    if (!_orderVerified) {
+      print('[CollectInfo] calling CF verifyOrderNumber for orderId=$_rawOrderId');
+      setState(() {
+        _step = _FlowStep.validating;
+        _inputEnabled = false;
+      });
+      _showLoading();
+
+      bool isValid = false;
+      try {
+        isValid = await _functionsSvc.verifyOrderNumber(_rawOrderId!);
+        print('[CollectInfo] CF result: orderId=$_rawOrderId isValid=$isValid (prime check)');
+      } catch (e) {
+        print('[CollectInfo] CF error: $e — treating as invalid');
+      }
+
+      _removeLoading();
+
+      if (!isValid) {
+        print('[CollectInfo] order number $_rawOrderId rejected (not prime), resetting');
+        setState(() {
+          _step = _FlowStep.collectInfo;
+          _inputEnabled = true;
+          _rawOrderId = null;
+          _productQuery = null;
+        });
+        _addBot(_s.orderNumberInvalidError);
+        return;
+      }
+
+      _orderVerified = true;
+      print('[CollectInfo] order number $_rawOrderId accepted (prime), proceeding');
+    }
+
+    print('[CollectInfo] all fields collected, calling OrderService');
     setState(() {
       _step = _FlowStep.validating;
       _inputEnabled = false;
@@ -192,16 +244,18 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
     _removeLoading();
 
     if (order == null) {
-      final failedQuery = _productQuery; // capture before clearing
+      print('[CollectInfo] OrderService returned null for product="$_productQuery"');
+      final failedQuery = _productQuery;
       setState(() {
         _step = _FlowStep.collectInfo;
         _inputEnabled = true;
-        _productQuery = null; // keep email+order, only retry product
+        _productQuery = null;
       });
       _addBot(_s.productNotFoundError(failedQuery ?? ''));
       return;
     }
 
+    print('[CollectInfo] order validated: id=${order.orderId} product="${order.productTitle}" total=${order.formattedTotal}');
     _order = order;
     setState(() {
       _step = _FlowStep.collectReason;
@@ -273,6 +327,14 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
 
   void _onGiftCardDeclined() {
     _addBot(_s.giftCardDeclinedMessage);
+    setState(() => _ladderStep = LadderStep.upsell);
+    _scrollToBottom();
+  }
+
+  void _onUpsellAccepted() => _resolveReturn(ReturnResolution.upsell);
+
+  void _onUpsellDeclined() {
+    _addBot(_s.upsellDeclinedMessage);
     setState(() => _ladderStep = LadderStep.refund);
     _scrollToBottom();
   }
@@ -321,6 +383,8 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
       case ReturnResolution.giftCard:
         return _s.confirmationGiftCard(
             _order?.formattedGiftCard ?? '', email, shortRef);
+      case ReturnResolution.upsell:
+        return _s.confirmationUpsell(email, shortRef);
       case ReturnResolution.refund:
         return _s.confirmationRefund(_order?.formattedTotal ?? '', shortRef);
       default:
@@ -438,6 +502,14 @@ class _ReturnFlowScreenState extends State<ReturnFlowScreen> {
           order: order,
           onAccepted: _onGiftCardAccepted,
           onDeclined: _onGiftCardDeclined,
+        );
+      case LadderStep.upsell:
+        return IncentiveStepCard(
+          key: const ValueKey('upsell'),
+          step: LadderStep.upsell,
+          order: order,
+          onAccepted: _onUpsellAccepted,
+          onDeclined: _onUpsellDeclined,
         );
       case LadderStep.refund:
         return IncentiveStepCard(

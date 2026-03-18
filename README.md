@@ -210,6 +210,14 @@ Before proceeding with the return flow, the app calls a Firebase Cloud Function 
 | Documenting and deploy fixing for easy app deployment recreation                       | 0.5        | 8                 |
 | Added tests and Order Number verification in Firebase in the return flow               | 0.5        | 8.5               |
 
+## AI & Stack used
+
+- **GROQ (Llama 3.3 70B)**: Used for generating AI responses in the chatbot. Provides fast and accurate answers to customer queries, given its performance in the free tier plan.
+- **Flutter Web**: Chosen for the frontend to allow a single codebase for both desktop and mobile web. Enables a rich, interactive UI for the chatbot widget.
+- **Firebase**: Used for hosting the Flutter Web app, storing session data and return request logs in Firestore, and running a Cloud Function for order number validation.
+- **Google Gemini** For initial information gathering, documentation and research. Used for decision-making, alternative approaches and formatting.
+- **Claude Code**: Used for the first implementation of the chatbot logic and response generation. Made tests and integration while I was researching on Google Gemini.
+
 ## Screenshots
 
 <div style="display:flex; gap:12px;">

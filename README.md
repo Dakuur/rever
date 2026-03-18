@@ -1,3 +1,5 @@
+# Demo video available here: https://youtu.be/AdKW7iV8m8Q
+
 # REVER – Shopify AI Chatbot
 
 An AI-powered chatbot embedded in a Shopify storefront as a floating widget. It handles two flows:
